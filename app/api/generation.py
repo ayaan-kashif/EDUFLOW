@@ -6,7 +6,7 @@ pipeline itself.
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
@@ -44,7 +44,7 @@ async def generate_lesson(
 
 
 class GenerateQuestionsRequest(BaseModel):
-    count: int = 3
+    count: int = Field(default=3, ge=1, le=50)
 
 
 @router.post("/assessments/{node_id}", response_model=list[ClaimOut])
