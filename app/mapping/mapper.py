@@ -15,6 +15,7 @@ import logging
 from dataclasses import dataclass
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.models import CurriculumNode, ExamQuestion, MappingMethod, QuestionNodeMapping
@@ -146,18 +147,41 @@ class EnsembleMapper:
         scored = await self.score_candidates(
             question, candidates, acceptable_terms=acceptable_terms
         )
+        existing_rows = (
+            (
+                await self._session.execute(
+                    select(QuestionNodeMapping).where(
+                        QuestionNodeMapping.question_id == question.id,
+                        QuestionNodeMapping.node_id.in_([c.node.id for c in scored]),
+                    )
+                )
+            )
+            .scalars()
+            .all()
+            if scored
+            else []
+        )
+        existing_by_node = {m.node_id: m for m in existing_rows}
+
         mappings = []
         for candidate in scored:
             if candidate.confidence < min_confidence:
                 continue
-            mapping = QuestionNodeMapping(
-                question_id=question.id,
-                node_id=candidate.node.id,
-                weight=candidate.weight,
-                confidence=candidate.confidence,
-                mapping_method=MappingMethod.HYBRID,
-            )
-            self._session.add(mapping)
+            mapping = existing_by_node.get(candidate.node.id)
+            if mapping is not None:
+                if mapping.mapping_method != MappingMethod.HUMAN_CORRECTED:
+                    mapping.weight = candidate.weight
+                    mapping.confidence = candidate.confidence
+                    mapping.mapping_method = MappingMethod.HYBRID
+            else:
+                mapping = QuestionNodeMapping(
+                    question_id=question.id,
+                    node_id=candidate.node.id,
+                    weight=candidate.weight,
+                    confidence=candidate.confidence,
+                    mapping_method=MappingMethod.HYBRID,
+                )
+                self._session.add(mapping)
             mappings.append(mapping)
         await self._session.commit()
         return mappings
