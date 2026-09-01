@@ -9,7 +9,9 @@ from app.domain.models import (
     QuestionNodeMapping,
 )
 from app.mapping.mapper import EnsembleMapper, MappingCandidate
+from app.mapping.mapper import _llm_scores
 from app.mapping.signals import SignalScores
+from app.providers.base import LLMResponse
 
 
 class FakeScalarResult:
@@ -42,6 +44,17 @@ class FakeSession:
 
     async def commit(self):
         self.committed = True
+
+
+class FakeLLMChain:
+    async def call(self, fn):
+        return LLMResponse(
+            text='```json\n{"11111111-1111-1111-1111-111111111111": 0.75}\n```',
+            model="fake-model",
+            provider="fake",
+            input_tokens=1,
+            output_tokens=1,
+        )
 
 
 class FixedScoreMapper(EnsembleMapper):
@@ -79,6 +92,20 @@ def _candidate(node: CurriculumNode, weight: float, confidence: float) -> Mappin
         weight=weight,
         confidence=confidence,
     )
+
+
+async def test_llm_scores_accepts_markdown_fenced_json():
+    node = CurriculumNode(
+        id=uuid.UUID("11111111-1111-1111-1111-111111111111"),
+        node_type=NodeType.OBJECTIVE,
+        label="Binary search",
+        origin=Origin.OFFICIAL,
+        confidence=1.0,
+    )
+
+    scores = await _llm_scores(FakeLLMChain(), "Explain binary search.", [node])
+
+    assert scores == {node.id: 0.75}
 
 
 async def test_map_question_updates_existing_machine_mapping_instead_of_duplicating():

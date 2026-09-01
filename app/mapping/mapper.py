@@ -19,6 +19,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.models import CurriculumNode, ExamQuestion, MappingMethod, QuestionNodeMapping
+from app.llm_json import loads_llm_json
 from app.mapping.signals import SignalScores, combine, cosine_similarity, lexical_overlap, terminology_match
 from app.providers.base import LLMMessage, ProviderError
 
@@ -83,7 +84,9 @@ async def _llm_scores(
         response = await llm_chain.call(
             lambda p: p.complete([LLMMessage(role="user", content=prompt)], max_tokens=1024)
         )
-        raw = json.loads(response.text.strip())
+        raw = loads_llm_json(response.text)
+        if not isinstance(raw, dict):
+            raise ValueError(f"expected score object, got {raw!r}")
         return {UUID(k): max(0.0, min(1.0, float(v))) for k, v in raw.items()}
     except (ProviderError, ValueError, KeyError, json.JSONDecodeError) as exc:
         logger.warning("mapping: LLM classification signal unavailable: %s", exc)
