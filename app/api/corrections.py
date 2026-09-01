@@ -34,6 +34,18 @@ class CorrectionOut(BaseModel):
     id: UUID
 
 
+def parse_mapping_weight(value, current: float) -> float:
+    if value is None:
+        return current
+    try:
+        weight = float(value)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail="weight must be numeric") from exc
+    if not 0.0 <= weight <= 1.0:
+        raise HTTPException(status_code=422, detail="weight must be between 0 and 1")
+    return weight
+
+
 @router.post("/", response_model=CorrectionOut)
 async def create_correction(
     body: CorrectionIn, session: AsyncSession = Depends(get_session)
@@ -51,7 +63,7 @@ async def create_correction(
         mapping = await session.get(QuestionNodeMapping, body.entity_id)
         if mapping is None:
             raise HTTPException(status_code=404, detail="question_node_mapping not found")
-        mapping.weight = float(body.after_value.get("weight", mapping.weight))
+        mapping.weight = parse_mapping_weight(body.after_value.get("weight"), mapping.weight)
         # Confidence is pinned to 1.0, not taken from after_value — a
         # teacher correction is definitionally certain, per §4's "always
         # wins when present".
