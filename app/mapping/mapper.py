@@ -168,9 +168,11 @@ class EnsembleMapper:
 
         mappings = []
         for candidate in scored:
-            if candidate.confidence < min_confidence:
-                continue
             mapping = existing_by_node.get(candidate.node.id)
+            if candidate.confidence < min_confidence:
+                if mapping is not None and mapping.mapping_method != MappingMethod.HUMAN_CORRECTED:
+                    await self._session.delete(mapping)
+                continue
             if mapping is not None:
                 if mapping.mapping_method != MappingMethod.HUMAN_CORRECTED:
                     mapping.weight = candidate.weight

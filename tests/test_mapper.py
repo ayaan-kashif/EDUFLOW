@@ -34,6 +34,7 @@ class FakeSession:
     def __init__(self, existing=None):
         self.existing = existing or []
         self.added = []
+        self.deleted = []
         self.committed = False
 
     async def execute(self, query):
@@ -41,6 +42,9 @@ class FakeSession:
 
     def add(self, obj):
         self.added.append(obj)
+
+    async def delete(self, obj):
+        self.deleted.append(obj)
 
     async def commit(self):
         self.committed = True
@@ -155,4 +159,51 @@ async def test_map_question_preserves_human_corrected_mapping():
     assert existing.confidence == 1.0
     assert existing.mapping_method == MappingMethod.HUMAN_CORRECTED
     assert existing.corrected_by == "teacher-1"
+    assert session.committed
+
+
+async def test_map_question_deletes_stale_machine_mapping_below_confidence_floor():
+    question = _question()
+    node = _node()
+    existing = QuestionNodeMapping(
+        question_id=question.id,
+        node_id=node.id,
+        weight=0.6,
+        confidence=0.6,
+        mapping_method=MappingMethod.HYBRID,
+    )
+    session = FakeSession(existing=[existing])
+
+    mappings = await FixedScoreMapper(session, [_candidate(node, 0.1, 0.1)]).map_question(
+        question, [node], min_confidence=0.2
+    )
+
+    assert mappings == []
+    assert session.added == []
+    assert session.deleted == [existing]
+    assert session.committed
+
+
+async def test_map_question_keeps_human_mapping_below_confidence_floor():
+    question = _question()
+    node = _node()
+    existing = QuestionNodeMapping(
+        question_id=question.id,
+        node_id=node.id,
+        weight=1.0,
+        confidence=1.0,
+        mapping_method=MappingMethod.HUMAN_CORRECTED,
+        corrected_by="teacher-1",
+    )
+    session = FakeSession(existing=[existing])
+
+    mappings = await FixedScoreMapper(session, [_candidate(node, 0.1, 0.1)]).map_question(
+        question, [node], min_confidence=0.2
+    )
+
+    assert mappings == []
+    assert session.added == []
+    assert session.deleted == []
+    assert existing.weight == 1.0
+    assert existing.confidence == 1.0
     assert session.committed
