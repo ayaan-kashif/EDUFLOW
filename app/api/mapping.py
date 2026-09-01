@@ -13,6 +13,7 @@ from app.db import get_session
 from app.domain.models import CurriculumNode, ExamQuestion, MarkSchemeEntry
 from app.mapping.mapper import EnsembleMapper
 from app.mapping.retrieval import top_k_similar_nodes
+from app.providers.base import ProviderError
 
 router = APIRouter(prefix="/mappings", tags=["mapping"])
 
@@ -79,7 +80,16 @@ async def map_question(
             .all()
         )
     elif embedding_router is not None:
-        query_vector = (await embedding_router.call(lambda p: p.embed([question.text]))).vectors[0]
+        try:
+            query_vector = (await embedding_router.call(lambda p: p.embed([question.text]))).vectors[0]
+        except ProviderError as exc:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "node_ids required: embedding provider failed while auto-shortlisting "
+                    f"candidates ({exc})"
+                ),
+            ) from exc
         candidates = await top_k_similar_nodes(session, query_vector, k=DEFAULT_SHORTLIST_K)
     else:
         # No explicit candidates and no embedding provider to shortlist
