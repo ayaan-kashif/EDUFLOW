@@ -57,6 +57,28 @@ def test_prerequisite_scheduled_strictly_before_dependent():
     assert validate_schedule(result.assignments, [dependent, prereq], windows) == []
 
 
+def test_prerequisite_requires_an_earlier_date_not_just_an_earlier_window():
+    prereq = UnitInput(unit_id=_uid(), duration_minutes=45)
+    dependent = UnitInput(
+        unit_id=_uid(), duration_minutes=45, prerequisite_unit_ids=(prereq.unit_id,)
+    )
+    same_day_windows = [
+        WindowInput(window_id=_uid(), date=START, available_minutes=45),
+        WindowInput(window_id=_uid(), date=START, available_minutes=45),
+    ]
+    next_day_window = WindowInput(
+        window_id=_uid(), date=START + timedelta(days=1), available_minutes=45
+    )
+
+    result = solve_schedule([dependent, prereq], same_day_windows + [next_day_window])
+
+    by_unit = {a.unit_id: a.date for a in result.assignments}
+    assert by_unit[prereq.unit_id] < by_unit[dependent.unit_id]
+    assert validate_schedule(
+        result.assignments, [dependent, prereq], same_day_windows + [next_day_window]
+    ) == []
+
+
 def test_unavailable_windows_are_never_used():
     units = [UnitInput(unit_id=_uid(), duration_minutes=60) for _ in range(2)]
     windows = _windows(4, unavailable={0, 1})

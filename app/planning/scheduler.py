@@ -218,7 +218,8 @@ def solve_schedule(
         return ScheduleResult("optimal", [], [], 0, 0)
 
     sorted_windows = sorted(windows, key=lambda w: (w.date, w.window_id.int))
-    date_index = {w.window_id: i for i, w in enumerate(sorted_windows)}
+    window_order_index = {w.window_id: i for i, w in enumerate(sorted_windows)}
+    date_ordinal = {w.window_id: w.date.toordinal() for w in sorted_windows}
 
     model = cp_model.CpModel()
     x: dict[tuple[UUID, UUID], cp_model.IntVar] = {}
@@ -235,17 +236,33 @@ def solve_schedule(
         if occupants:
             model.Add(sum(occupants) <= 1)
 
-    # date_index[u] == the window index it lands on, or 0 if left
+    # schedule_order[u] == the window index it lands on, or 0 if left
     # unscheduled (all its x vars are 0, so the sum collapses to 0 for
     # free — no separate "unscheduled" case to model).
-    unit_date_index: dict[UUID, cp_model.IntVar] = {}
+    # scheduled_date[u] tracks the actual calendar date ordinal, because
+    # prerequisite ordering is date-based. Multiple windows may exist on a
+    # single day; comparing raw window order would allow "prerequisite at
+    # 09:00, dependent at 11:00" even though the hard constraint checked by
+    # validate_schedule requires a strictly earlier day.
+    schedule_order: dict[UUID, cp_model.IntVar] = {}
+    scheduled_date: dict[UUID, cp_model.IntVar] = {}
     is_scheduled: dict[UUID, cp_model.IntVar] = {}
     for unit in units:
         candidates = candidates_by_unit[unit.unit_id]
-        var = model.NewIntVar(0, max(len(sorted_windows), 1), f"date_idx_{unit.unit_id}")
-        unit_date_index[unit.unit_id] = var
+        order_var = model.NewIntVar(0, max(len(sorted_windows), 1), f"order_idx_{unit.unit_id}")
+        date_var = model.NewIntVar(0, date_.max.toordinal(), f"date_ord_{unit.unit_id}")
+        schedule_order[unit.unit_id] = order_var
+        scheduled_date[unit.unit_id] = date_var
         model.Add(
-            var == sum(date_index[w.window_id] * x[(unit.unit_id, w.window_id)] for w in candidates)
+            order_var
+            == sum(
+                window_order_index[w.window_id] * x[(unit.unit_id, w.window_id)]
+                for w in candidates
+            )
+        )
+        model.Add(
+            date_var
+            == sum(date_ordinal[w.window_id] * x[(unit.unit_id, w.window_id)] for w in candidates)
         )
 
         # Scheduling every unit that has at least one legal candidate
@@ -264,12 +281,12 @@ def solve_schedule(
 
     for unit in units:
         for prereq_id in unit.prerequisite_unit_ids:
-            if prereq_id not in unit_date_index:
+            if prereq_id not in scheduled_date:
                 continue
             # Only enforced when both units are actually scheduled — an
-            # unscheduled prerequisite (date_index pinned to 0) must not
+            # unscheduled prerequisite (date ordinal pinned to 0) must not
             # spuriously block its dependent.
-            model.Add(unit_date_index[unit.unit_id] > unit_date_index[prereq_id]).OnlyEnforceIf(
+            model.Add(scheduled_date[unit.unit_id] > scheduled_date[prereq_id]).OnlyEnforceIf(
                 [is_scheduled[unit.unit_id], is_scheduled[prereq_id]]
             )
 
@@ -288,7 +305,7 @@ def solve_schedule(
             # (e.g. it became unavailable), there's no "stay" option to
             # penalize against — any assignment already counts as moved.
 
-    total_index = sum(unit_date_index.values()) if unit_date_index else 0
+    total_index = sum(schedule_order.values()) if schedule_order else 0
     model.Minimize(churn_penalty * sum(churn_terms) + total_index)
 
     solver = cp_model.CpSolver()
