@@ -8,7 +8,7 @@ app/ingestion/curriculum_extraction.py for the actual logic.
 
 import shutil
 import uuid
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
@@ -31,6 +31,19 @@ router = APIRouter(prefix="/ingestion", tags=["ingestion"])
 UPLOAD_DIR = Path(__file__).resolve().parent.parent.parent / "uploads"
 
 
+def safe_upload_filename(filename: str | None) -> str:
+    """Collapse client-provided filenames to a single local name.
+
+    Browsers normally send a basename, but API clients can send Windows or
+    POSIX paths. Treat both separator styles as untrusted input before
+    prefixing with our UUID.
+    """
+    if not filename:
+        return "upload"
+    name = PureWindowsPath(PurePosixPath(filename).name).name
+    return name or "upload"
+
+
 class DocumentOut(BaseModel):
     id: UUID
     title: str
@@ -48,7 +61,7 @@ async def upload_document(
     session: AsyncSession = Depends(get_session),
 ) -> DocumentOut:
     UPLOAD_DIR.mkdir(exist_ok=True)
-    dest = UPLOAD_DIR / f"{uuid.uuid4().hex}_{file.filename}"
+    dest = UPLOAD_DIR / f"{uuid.uuid4().hex}_{safe_upload_filename(file.filename)}"
     with dest.open("wb") as out:
         shutil.copyfileobj(file.file, out)
 
