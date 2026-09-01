@@ -20,6 +20,17 @@ from app.domain.models import AcademicCalendar, CalendarDay, DayType, Instructio
 router = APIRouter(prefix="/calendars", tags=["calendar"])
 
 
+def slot_duration_minutes(start_time: time, end_time: time) -> int:
+    """Return same-day slot duration in whole minutes.
+
+    Negative timedeltas have a positive `.seconds` remainder, so use
+    `total_seconds()` here to reject inverted slots instead of turning
+    them into almost-24-hour windows.
+    """
+    delta = datetime.combine(date.min, end_time) - datetime.combine(date.min, start_time)
+    return int(delta.total_seconds() // 60)
+
+
 class CreateCalendarRequest(BaseModel):
     school_id: str
     term_start: date
@@ -126,9 +137,7 @@ async def create_instruction_windows(
 
     created = 0
     for slot in body.slots:
-        minutes = (
-            datetime.combine(date.min, slot.end_time) - datetime.combine(date.min, slot.start_time)
-        ).seconds // 60
+        minutes = slot_duration_minutes(slot.start_time, slot.end_time)
         if minutes <= 0:
             raise HTTPException(status_code=422, detail=f"end_time must be after start_time for {slot}")
         for day in school_days:
