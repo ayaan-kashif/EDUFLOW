@@ -2,7 +2,11 @@
 
 This folder is a complete build brief for **CurriculumOS**: a curriculum planning engine that grounds every scheduled lesson in a verifiable source, and automatically repairs the term plan when the calendar changes.
 
-It's written to be handed to an agentic coding tool (or a human engineering team) as a self-contained spec. Read the files in this order:
+It's written to be handed to an agentic coding tool (or a human engineering team) as a self-contained spec.
+
+If you are joining an already-started build, read `10_BUILD_PROGRESS.md` first. It summarizes what has already been implemented, recent commits, verification status, and the best next task so you do not need to rediscover the whole repository before continuing.
+
+For the original product/build brief, read the files in this order:
 
 | # | File | What it answers |
 |---|---|---|
