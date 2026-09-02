@@ -1077,6 +1077,18 @@ async function schedule(el, planId) {
   } catch {}
 }
 
+async function planDiff(planId) {
+  const rows = await api(`/planning/plans/${planId}/diff`);
+  if (!rows.length) return '<div class="empty">No comparable scheduled units.</div>';
+  return table(rows, [
+    { h: 'Change', f: r => `<span class="chip ${r.change_type === 'unchanged' ? 'ok' : r.change_type === 'removed' ? 'crit' : 'warn'}">${esc(r.change_type)}</span>` },
+    { h: 'Lesson', f: r => esc(r.node_label) },
+    { h: 'Previous', cls: 'mono', f: r => r.previous_date || '—' },
+    { h: 'Now', cls: 'mono', f: r => r.current_date || '—' },
+    { h: 'Minutes', right: true, cls: 'num-col', f: r => `${r.previous_minutes ?? '—'} → ${r.current_minutes ?? '—'}` },
+  ]);
+}
+
 /** This browser's plan, or the newest one already in the database — a
  *  fresh browser has no stored id but the plan still exists. */
 async function currentPlan() {
@@ -1123,6 +1135,7 @@ $('btn-replan').onclick = async () => {
       { v: plan.moved_count, l: 'moved', kind: plan.moved_count ? 'warn' : 'ok' },
       { v: plan.unscheduled_unit_ids.length, l: 'dropped', kind: plan.unscheduled_unit_ids.length ? 'crit' : 'ok' },
     ]) + '<p class="aside">The first figure is the one that matters. A replan is judged by how little it disturbs.</p>';
+    el.insertAdjacentHTML('beforeend', await planDiff(plan.plan_version_id));
     await schedule(el, plan.plan_version_id); ledger();
   } catch (e) { failed(el, e); }
 };

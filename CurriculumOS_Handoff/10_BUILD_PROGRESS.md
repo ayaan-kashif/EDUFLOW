@@ -100,9 +100,9 @@ the whole repository. Keep it updated after each major change.
   - `/` returned the teacher workspace HTML
   - `/docs` returned the OpenAPI UI
   - `/stats` returned DB-backed counts
-- Full lightweight test suite passes with `137 passed, 1 skipped`.
-- One pytest cache warning remains in the Codex sandbox because writing under
-  `.pytest_cache` was denied; it does not affect test results.
+- Full lightweight test suite passes with `139 passed, 1 skipped`.
+- Python 3.14 local environment verified; tests pass despite project docs
+  saying 3.11+.
 
 ## Known Gaps / Next Work
 
@@ -126,9 +126,11 @@ Highest priority:
    - The data model exists, but the teacher workflow for marking mastered /
      needs reinforcement / reteach is not fully exposed.
 
-5. Add plan-diff endpoint.
-   - Replanning returns unchanged/moved counts, but there is no rich API yet for
-     "old date -> new date" lesson diffs.
+5. ~~Add plan-diff endpoint.~~ ✅ Done.
+   - Pure `diff_schedules()` helper in `app/planning/service.py`.
+   - `GET /planning/plans/{id}/diff` endpoint returns per-unit change details.
+   - Replan UI shows previous date → new date, minutes, and change type.
+   - Tests in `tests/test_planning_diff.py` pass.
 
 6. Add real demo seeding / one-command demo path.
    - A sample syllabus exists under `demo/`, and one document was present in
@@ -147,6 +149,6 @@ Highest priority:
 
 ## Suggested Next Task
 
-Add the plan-diff API and wire it into the replan stage of the UI. That closes
-one of the most visible MVP acceptance gaps: showing exactly what moved after a
-calendar disruption.
+Add class-level mastery signal endpoints and UI. The data model exists but
+the teacher workflow for marking mastered / needs reinforcement / reteach is
+not exposed in the workspace.

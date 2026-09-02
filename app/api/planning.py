@@ -20,7 +20,7 @@ from app.domain.models import (
     ScheduledUnit,
     TeachingUnit,
 )
-from app.planning.service import PlanningService
+from app.planning.service import PlanningService, ScheduledUnitSnapshot, diff_schedules
 
 router = APIRouter(prefix="/planning", tags=["planning"])
 
@@ -117,6 +117,32 @@ class ScheduledUnitOut(BaseModel):
     status: str
 
 
+async def _scheduled_snapshots(
+    session: AsyncSession, plan_version_id: UUID
+) -> list[ScheduledUnitSnapshot]:
+    rows = (
+        await session.execute(
+            select(ScheduledUnit, TeachingUnit, CurriculumNode, InstructionWindow, CalendarDay)
+            .join(TeachingUnit, TeachingUnit.id == ScheduledUnit.unit_id)
+            .join(CurriculumNode, CurriculumNode.id == TeachingUnit.node_id)
+            .join(InstructionWindow, InstructionWindow.id == ScheduledUnit.instruction_window_id)
+            .join(CalendarDay, CalendarDay.id == InstructionWindow.calendar_day_id)
+            .where(ScheduledUnit.plan_version == plan_version_id)
+            .order_by(CalendarDay.date)
+        )
+    ).all()
+    return [
+        ScheduledUnitSnapshot(
+            unit_id=su.unit_id,
+            node_label=node.label,
+            date=day.date,
+            scheduled_minutes=su.scheduled_minutes,
+            status=su.status.value,
+        )
+        for su, _, node, _, day in rows
+    ]
+
+
 @router.get("/plans/{plan_version_id}", response_model=list[ScheduledUnitOut])
 async def get_plan(
     plan_version_id: UUID, session: AsyncSession = Depends(get_session)
@@ -142,4 +168,44 @@ async def get_plan(
     return [
         ScheduledUnitOut(id=su.id, node_label=node.label, date=day.date, scheduled_minutes=su.scheduled_minutes, status=su.status.value)
         for su, tu, node, win, day in rows
+    ]
+
+
+class PlanDiffOut(BaseModel):
+    unit_id: UUID
+    node_label: str
+    previous_date: date | None
+    current_date: date | None
+    previous_minutes: int | None
+    current_minutes: int | None
+    change_type: str
+
+
+@router.get("/plans/{plan_version_id}/diff", response_model=list[PlanDiffOut])
+async def get_plan_diff(
+    plan_version_id: UUID,
+    base_plan_version_id: UUID | None = None,
+    session: AsyncSession = Depends(get_session),
+) -> list[PlanDiffOut]:
+    plan = await session.get(PlanVersion, plan_version_id)
+    if plan is None:
+        raise HTTPException(status_code=404, detail="plan_version not found")
+
+    base_id = base_plan_version_id or plan.parent_version_id
+    if base_id is None:
+        raise HTTPException(
+            status_code=400,
+            detail="base_plan_version_id required: plan has no parent_version_id",
+        )
+
+    base = await session.get(PlanVersion, base_id)
+    if base is None:
+        raise HTTPException(status_code=404, detail="base plan_version not found")
+
+    return [
+        PlanDiffOut(**item.__dict__)
+        for item in diff_schedules(
+            await _scheduled_snapshots(session, base_id),
+            await _scheduled_snapshots(session, plan_version_id),
+        )
     ]
