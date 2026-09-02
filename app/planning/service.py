@@ -19,7 +19,12 @@ from app.domain.models import (
     ScheduledUnitStatus,
     TeachingUnit,
 )
-from app.planning.scheduler import Assignment, ScheduleResult, UnitInput, WindowInput, solve_schedule
+from app.planning.scheduler import (
+    ScheduleResult,
+    UnitInput,
+    WindowInput,
+    solve_schedule,
+)
 
 
 @dataclass(frozen=True)
@@ -71,7 +76,11 @@ def diff_schedules(
         else:
             change_type = "moved"
 
-        label = new.node_label if new is not None else old.node_label
+        if new is not None:
+            label = new.node_label
+        else:
+            assert old is not None  # guaranteed by the elif chain
+            label = old.node_label
         diff.append(
             PlanDiffItem(
                 unit_id=unit_id,
@@ -110,7 +119,7 @@ async def _load_windows(
             InstructionWindow.class_id == class_id,
         )
     )
-    return list(result.all())
+    return list(result.all())  # type: ignore[arg-type]  # SQLAlchemy Result.all() is a Sequence
 
 
 async def _previous_assignment(

@@ -33,10 +33,10 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()
+    return Settings()  # type: ignore[call-arg]  # pydantic-settings loads from env
 
 
 @lru_cache
 def get_provider_config() -> dict[str, Any]:
     with PROVIDERS_CONFIG_PATH.open() as f:
-        return yaml.safe_load(f)
+        return yaml.safe_load(f)  # type: ignore[no-any-return]

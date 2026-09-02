@@ -162,6 +162,5 @@ Highest priority:
 
 ## Suggested Next Task
 
-Add linting and type checking to the project with ruff and mypy.
-Currently only ruff is in dev dependencies; mypy and type stubs would
-catch the kind of type mismatches that only surface at runtime.
+Add a requirements.txt or lock file for reproducible installs across
+devices and CI.

@@ -3,7 +3,7 @@ app/planning/service.py — see that module and app/planning/scheduler.py
 for the actual solve logic.
 """
 
-from datetime import date
+import datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -37,7 +37,7 @@ class BuildPlanRequest(BaseModel):
 class AssignmentOut(BaseModel):
     unit_id: UUID
     window_id: UUID
-    date: date
+    date: datetime.date
 
 
 class PlanOut(BaseModel):
@@ -88,13 +88,12 @@ async def list_plans(session: AsyncSession = Depends(get_session)) -> list[PlanV
     storage, but a fresh browser has none — this is how it finds the plans
     that already exist rather than making the user rebuild one.
     """
-    counts = dict(
-        (
-            await session.execute(
-                select(ScheduledUnit.plan_version, func.count()).group_by(ScheduledUnit.plan_version)
-            )
-        ).all()
-    )
+    raw_counts = (
+        await session.execute(
+            select(ScheduledUnit.plan_version, func.count()).group_by(ScheduledUnit.plan_version)
+        )
+    ).all()
+    counts: dict[UUID, int] = {row[0]: row[1] for row in raw_counts}
     versions = (
         (await session.execute(select(PlanVersion).order_by(PlanVersion.created_at.desc())))
         .scalars()
@@ -112,7 +111,7 @@ async def list_plans(session: AsyncSession = Depends(get_session)) -> list[PlanV
 class ScheduledUnitOut(BaseModel):
     id: UUID
     node_label: str
-    date: date
+    date: datetime.date
     scheduled_minutes: int
     status: str
 
@@ -174,8 +173,8 @@ async def get_plan(
 class PlanDiffOut(BaseModel):
     unit_id: UUID
     node_label: str
-    previous_date: date | None
-    current_date: date | None
+    previous_date: datetime.date | None
+    current_date: datetime.date | None
     previous_minutes: int | None
     current_minutes: int | None
     change_type: str
@@ -232,7 +231,7 @@ class JustificationOut(BaseModel):
     node_label: str
     node_description: str | None
     syllabus_ref: str | None
-    date: date
+    date: datetime.date
     scheduled_minutes: int
     # Prerequisites that must come before this lesson
     prerequisites: list[PrerequisiteOut]
@@ -250,7 +249,7 @@ class JustificationOut(BaseModel):
     total_days_in_term: int | None
     # Churn context (replan only)
     was_moved: bool
-    previous_date: date | None
+    previous_date: datetime.date | None
 
 
 @router.get(
@@ -265,7 +264,6 @@ async def get_unit_justification(
     """Why is this lesson scheduled here? Full provenance: prerequisite
     dependency, objective, source pages, emphasis weight, and time-to-exam.
     """
-    from datetime import timedelta
 
     from app.domain.models import (
         AcademicCalendar,
@@ -295,7 +293,7 @@ async def get_unit_justification(
     ).first()
     if row is None:
         raise HTTPException(status_code=404, detail="scheduled unit not found")
-    su, tu, node, win, day = row
+    su, tu, node, _win, day = row
 
     # 2. Load the calendar for term_end
     cal = await session.get(AcademicCalendar, day.calendar_id)
@@ -395,7 +393,7 @@ async def get_unit_justification(
 
     # 6. Churn context: was this unit moved from a previous plan?
     was_moved = False
-    previous_date_val: date | None = None
+    previous_date_val: datetime.date | None = None
     if su.plan_version:
         pv = await session.get(PlanVersion, su.plan_version)
         if pv and pv.parent_version_id:
