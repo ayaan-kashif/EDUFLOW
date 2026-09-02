@@ -135,10 +135,11 @@ Highest priority:
    - Replan UI shows previous date → new date, minutes, and change type.
    - Tests in `tests/test_planning_diff.py` pass.
 
-6. Add real demo seeding / one-command demo path.
-   - A sample syllabus exists under `demo/`, and one document was present in
-     the local database during verification, but the repo needs a robust demo
-     script that can seed enough data to exercise all ten stages.
+6. ~~Add real demo seeding / one-command demo path.~~ ✅ Done.
+   - `scripts/demo_seed.py`: fully self-contained, generates PDFs in memory.
+   - Covers all 10 stages: upload, extract, embed, parse, map, corrections,
+     mastery, emphasis, calendar, plan, replan+diff, generation.
+   - No external PDF files required — runs with just `uvicorn app.main:app`.
 
 ## Things Not To Add Silently
 
@@ -152,6 +153,6 @@ Highest priority:
 
 ## Suggested Next Task
 
-Add real demo seeding / one-command demo path. A sample syllabus exists
-under `demo/`, but the repo needs a robust demo script that can seed
-enough data to exercise all ten stages without manual clicking.
+Add endpoint/service tests for DB-backed orchestration. Current tests are
+mostly pure logic and fake-session tests. Live Postgres coverage is
+intentionally sparse but needed before a production deploy.
