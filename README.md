@@ -41,15 +41,13 @@ A teacher workspace at `/` walks all ten stages in order.
 4. Verification must use a different provider/model than generation. A model does not grade its own homework; this is enforced at call time, not just in config.
 5. Minimizing replan churn is a first-class scheduling objective, not an afterthought.
 
-## Quick start (hackathon demo)
+## Quick start (hackathon demo — no Docker needed)
 
-Requires Docker and Python 3.11+.
+Requires Python 3.11+. No Docker, no Postgres — uses SQLite.
 
 ```bash
-cp .env.example .env          # fill in at least DATABASE_URL
-docker compose up -d db
-pip install -e ".[dev]"       # lightweight: app + tests + linting
-alembic upgrade head
+pip install -e ".[dev]" aiosqlite  # lightweight: app + tests + linting
+DATABASE_URL=sqlite+aiosqlite:///./curriculumos.db python scripts/setup_sqlite.py
 uvicorn app.main:app --reload
 ```
 
@@ -60,6 +58,15 @@ python scripts/demo_seed.py   # exercises all 10 pipeline stages
 ```
 
 Or open <http://localhost:8000> and walk the workspace manually.
+
+### With Docker (PostgreSQL)
+
+```bash
+cp .env.example .env          # DATABASE_URL=postgresql+asyncpg://...
+docker compose up -d db
+alembic upgrade head
+uvicorn app.main:app --reload
+```
 
 Optional integrations are split out so a fresh setup does not download every
 OCR, worker, and cloud-provider dependency before the app can boot:

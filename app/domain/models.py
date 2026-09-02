@@ -32,9 +32,7 @@ from datetime import datetime
 from datetime import time as time_
 from enum import Enum
 
-from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
-    ARRAY,
     CheckConstraint,
     DateTime,
     Float,
@@ -46,8 +44,9 @@ from sqlalchemy import (
     UniqueConstraint,
 )
 from sqlalchemy import Enum as SAEnum
-from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
+
+from app.domain.types import PortableArray, PortableJSON, PortableUUID, PortableVector
 
 from app.domain.base import Base, CreatedAtMixin, UUIDPk
 
@@ -139,7 +138,7 @@ class CurriculumNode(UUIDPk, CreatedAtMixin, Base):
     label: Mapped[str] = mapped_column(String, nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
     syllabus_ref: Mapped[str | None] = mapped_column(String, index=True)  # e.g. "BIO.ENZ.03"
-    embedding: Mapped[list[float] | None] = mapped_column(Vector(1024), nullable=True)
+    embedding: Mapped[list[float] | None] = mapped_column(PortableVector(1024), nullable=True)
     origin: Mapped[Origin] = mapped_column(_str_enum(Origin, "origin"), nullable=False)
     confidence: Mapped[float] = _confidence_column()
 
@@ -196,7 +195,7 @@ class SourceSpan(UUIDPk, Base):
     )
     page: Mapped[int] = mapped_column(Integer, nullable=False)
     block_id: Mapped[str] = mapped_column(String, nullable=False)
-    bbox: Mapped[list[float]] = mapped_column(ARRAY(Float), nullable=False)  # [x1, y1, x2, y2]
+    bbox: Mapped[list[float]] = mapped_column(PortableArray(), nullable=False)  # [x1, y1, x2, y2]
     text: Mapped[str] = mapped_column(Text, nullable=False)
     # sha256 of `text` at extraction time. Purpose: detect drift when a
     # source document is re-ingested (changed hash on the same block_id
@@ -230,7 +229,7 @@ class MarkSchemeEntry(UUIDPk, Base):
         ForeignKey("exam_questions.id", ondelete="CASCADE"), nullable=False, index=True
     )
     text: Mapped[str] = mapped_column(Text, nullable=False)
-    acceptable_terms: Mapped[list[str] | None] = mapped_column(ARRAY(String))
+    acceptable_terms: Mapped[list[str] | None] = mapped_column(PortableArray())
     marks_awarded: Mapped[int | None] = mapped_column(Integer)
 
 
@@ -309,7 +308,7 @@ class TeachingUnit(UUIDPk, Base):
     minimum_session_minutes: Mapped[int | None] = mapped_column(Integer)
     priority: Mapped[float] = mapped_column(Float, nullable=False)
     prerequisite_unit_ids: Mapped[list[uuid.UUID] | None] = mapped_column(
-        ARRAY(UUID(as_uuid=True))
+        PortableArray()
     )
 
 
@@ -405,9 +404,9 @@ class TeacherCorrection(UUIDPk, CreatedAtMixin, Base):
     __tablename__ = "teacher_corrections"
 
     entity_type: Mapped[str] = mapped_column(String, nullable=False)
-    entity_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
-    before_value: Mapped[dict] = mapped_column(JSONB, nullable=False)
-    after_value: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    entity_id: Mapped[uuid.UUID] = mapped_column(PortableUUID(as_uuid=True), nullable=False)
+    before_value: Mapped[dict] = mapped_column(PortableJSON(), nullable=False)
+    after_value: Mapped[dict] = mapped_column(PortableJSON(), nullable=False)
     teacher_id: Mapped[str] = mapped_column(String, nullable=False)
 
     __table_args__ = (Index("ix_teacher_corrections_entity", "entity_type", "entity_id"),)

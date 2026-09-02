@@ -8,7 +8,16 @@ from app.config import get_settings
 
 @lru_cache
 def _get_session_factory():
-    engine = create_async_engine(get_settings().database_url, pool_pre_ping=True)
+    url = get_settings().database_url
+    # SQLite needs aiosqlite as the async driver
+    if url.startswith("sqlite"):
+        import aiosqlite  # noqa: F401  — registers the async driver
+        connect_args = {"check_same_thread": False}
+    else:
+        connect_args = {}
+    engine = create_async_engine(
+        url, pool_pre_ping=True, connect_args=connect_args,
+    )
     return async_sessionmaker(engine, expire_on_commit=False)
 
 
