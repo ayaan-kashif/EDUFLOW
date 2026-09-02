@@ -24,7 +24,7 @@ the whole repository. Keep it updated after each major change.
 
 - FastAPI app with a single static teacher workspace at `/`.
 - Health, ingestion, calendar, mapping, emphasis, planning, correction,
-  generation, browse, and debug routers.
+  mastery, generation, browse, and debug routers.
 - SQLAlchemy ORM models for the MVP schema, including:
   - source documents and source spans
   - curriculum nodes and edges
@@ -65,6 +65,7 @@ the whole repository. Keep it updated after each major change.
 - `83fabef` - Handle mapping shortlist embedding failures
 - `14076ce` - Validate assessment generation count
 - `d5e82e1` - Validate correction mapping weights
+- `baee326` - Add plan-diff API and replan UI comparison table
 
 ## Important Fixes Already Made
 
@@ -100,7 +101,7 @@ the whole repository. Keep it updated after each major change.
   - `/` returned the teacher workspace HTML
   - `/docs` returned the OpenAPI UI
   - `/stats` returned DB-backed counts
-- Full lightweight test suite passes with `139 passed, 1 skipped`.
+- Full lightweight test suite passes with `143 passed, 1 skipped`.
 - Python 3.14 local environment verified; tests pass despite project docs
   saying 3.11+.
 
@@ -122,9 +123,11 @@ Highest priority:
      prerequisite dependency, objective, source pages, emphasis weight, and
      time-to-exam.
 
-4. Add class-level mastery signal endpoints/UI.
-   - The data model exists, but the teacher workflow for marking mastered /
-     needs reinforcement / reteach is not fully exposed.
+4. ~~Add class-level mastery signal endpoints/UI.~~ ✅ Done.
+   - `app/api/mastery.py` with list, create, and summary endpoints.
+   - Teacher workspace UI in stage 05: mark objectives as mastered /
+     needs reinforcement / reteach with summary figures.
+   - Tests in `tests/test_mastery.py` pass.
 
 5. ~~Add plan-diff endpoint.~~ ✅ Done.
    - Pure `diff_schedules()` helper in `app/planning/service.py`.
@@ -149,6 +152,6 @@ Highest priority:
 
 ## Suggested Next Task
 
-Add class-level mastery signal endpoints and UI. The data model exists but
-the teacher workflow for marking mastered / needs reinforcement / reteach is
-not exposed in the workspace.
+Add real demo seeding / one-command demo path. A sample syllabus exists
+under `demo/`, but the repo needs a robust demo script that can seed
+enough data to exercise all ten stages without manual clicking.

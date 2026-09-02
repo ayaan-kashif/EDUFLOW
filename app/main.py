@@ -12,6 +12,7 @@ from app.api.generation import router as generation_router
 from app.api.health import router as health_router
 from app.api.ingestion import router as ingestion_router
 from app.api.mapping import router as mapping_router
+from app.api.mastery import router as mastery_router
 from app.api.planning import router as planning_router
 
 app = FastAPI(title="CurriculumOS")
@@ -19,6 +20,7 @@ app.include_router(health_router)
 app.include_router(ingestion_router)
 app.include_router(calendar_router)
 app.include_router(mapping_router)
+app.include_router(mastery_router)
 app.include_router(emphasis_router)
 app.include_router(planning_router)
 app.include_router(corrections_router)

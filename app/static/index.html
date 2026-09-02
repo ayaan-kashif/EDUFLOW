@@ -507,6 +507,25 @@ a { color: var(--accent); }
           <button class="quiet" data-refresh="loadCorrectable">Reload</button></div>
         <div class="panel-body"><div id="out-correctable"></div></div>
       </div>
+
+      <div class="panel">
+        <div class="panel-head"><h3>Class mastery</h3>
+          <p class="panel-note">Mark each objective for a class: mastered, needs reinforcement, or reteach.</p>
+          <button class="quiet" data-refresh="loadMastery">Reload</button></div>
+        <div class="panel-body">
+          <div class="field-row">
+            <div class="field"><label for="mast-class">Class</label><input id="mast-class" value="CS-4A"></div>
+          </div>
+          <div class="readout" id="out-mastery-summary"></div>
+          <div class="field-row" style="margin-top:.7rem">
+            <div class="field" style="flex:3 1 280px"><label for="mast-node">Objective</label><select id="mast-node"></select></div>
+            <div class="field"><label for="mast-status">Status</label>
+              <select id="mast-status"><option value="mastered">mastered</option><option value="needs_reinforcement" selected>needs reinforcement</option><option value="reteach">reteach</option></select></div>
+          </div>
+          <div class="actions"><button class="go" id="btn-mastery">Mark objective</button></div>
+          <div class="readout" id="out-mastery"></div>
+        </div>
+      </div>
     </section>
 
     <!-- 06 -->
@@ -951,6 +970,72 @@ async function correct(id, before) {
   } catch (e) { failed(el, e); }
 }
 
+/* ---------- 05b mastery ---------- */
+const MASTERY_STATUS = { mastered: 'ok', needs_reinforcement: 'warn', reteach: 'crit' };
+
+async function loadMastery() {
+  const el = $('out-mastery'), classId = $('mast-class').value;
+  if (!classId) return;
+  try {
+    const rows = await api(`/mastery/?class_id=${encodeURIComponent(classId)}`);
+    if (!rows.length) {
+      el.innerHTML = '<div class="empty">No mastery signals yet. Mark objectives below.</div>';
+      // still load summary
+      loadMasterySummary();
+      return;
+    }
+    el.innerHTML = table(rows, [
+      { h: 'Objective', f: r => esc(r.node_label) },
+      { h: 'Status', f: r => `<span class="chip ${MASTERY_STATUS[r.status] || ''}">${esc(r.status)}</span>` },
+      { h: 'Marked by', f: r => esc(r.marked_by) },
+      { h: '', f: r => {
+        const opts = ['mastered','needs_reinforcement','reteach']
+          .map(s => `<option value="${s}"${s === r.status ? ' selected' : ''}>${s}</option>`).join('');
+        return `<select id="ms-${r.id}" style="width:auto;font-size:.78rem">${opts}</select> <button class="quiet" onclick="updateMastery('${r.id}','${esc(r.node_id)}')">Save</button>`;
+      }},
+    ]);
+    loadMasterySummary();
+  } catch (e) { failed(el, e); }
+}
+
+async function updateMastery(signalId, nodeId) {
+  const el = $('out-mastery'), classId = $('mast-class').value;
+  const status = $('ms-' + signalId).value;
+  try {
+    await api('/mastery/', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ class_id: classId, node_id: nodeId, status, teacher_id: 'demo-teacher' }),
+    });
+    await loadMastery();
+  } catch (e) { failed(el, e); }
+}
+
+async function loadMasterySummary() {
+  const el = $('out-mastery-summary'), classId = $('mast-class').value;
+  if (!classId) return;
+  try {
+    const s = await api(`/mastery/summary?class_id=${encodeURIComponent(classId)}`);
+    el.innerHTML = figures([
+      { v: s.mastered, l: 'mastered', kind: 'ok' },
+      { v: s.needs_reinforcement, l: 'reinforce', kind: 'warn' },
+      { v: s.reteach, l: 'reteach', kind: 'crit' },
+      { v: s.unmarked, l: 'unmarked' },
+    ]);
+  } catch {}
+}
+
+$('btn-mastery').onclick = async () => {
+  const el = $('out-mastery'), classId = $('mast-class').value, nodeId = $('mast-node').value;
+  if (!classId || !nodeId) return said(el, 'Choose a class and objective', 'warn');
+  try {
+    await api('/mastery/', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ class_id: classId, node_id: nodeId, status: $('mast-status').value, teacher_id: 'demo-teacher' }),
+    });
+    await loadMastery();
+  } catch (e) { failed(el, e); }
+};
+
 /* ---------- 06 emphasis ---------- */
 let EMPHASIS = {};
 $('btn-emphasis').onclick = async () => {
@@ -1200,7 +1285,7 @@ const ON_ENTER = {
   curriculum: () => { loadDocuments(); loadNodes(); },
   questions: () => { loadDocuments(); loadQuestions(); },
   mapping: async () => { await loadQuestions(); loadNodes(); loadMappings(); },
-  corrections: loadCorrectable,
+  corrections: async () => { loadCorrectable(); loadNodes(); loadMastery(); fillSelect($('mast-node'), NODES, n => `${n.syllabus_ref || ''} ${n.label}`.trim()); },
   emphasis: loadNodes,
   calendar: loadCalendars,
   plan: () => { loadCalendars(); loadNodes(); },
