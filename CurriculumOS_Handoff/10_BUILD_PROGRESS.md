@@ -101,7 +101,7 @@ the whole repository. Keep it updated after each major change.
   - `/` returned the teacher workspace HTML
   - `/docs` returned the OpenAPI UI
   - `/stats` returned DB-backed counts
-- Full lightweight test suite passes with `161 passed, 1 skipped`.
+- Full lightweight test suite passes with `164 passed, 1 skipped`.
 - Python 3.14 local environment verified; tests pass despite project docs
   saying 3.11+.
 
@@ -124,10 +124,13 @@ Highest priority:
    - `tests/test_ingestion_service_db.py`: 3 tests covering document and
      span persistence with a fake parser.
 
-3. Improve the "why is this scheduled here?" acceptance criterion.
-   - The UI can show a schedule, but a complete justification should include:
-     prerequisite dependency, objective, source pages, emphasis weight, and
-     time-to-exam.
+3. ~~Improve the "why is this scheduled here?" acceptance criterion.~~ ✅ Done.
+   - `GET /planning/plans/{id}/units/{id}/justification` returns full
+     provenance: objective, prerequisites, emphasis breakdown, source
+     pages, time-to-exam, and churn context.
+   - UI: each schedule row has a "why?" button that expands a detailed
+     justification panel with all five acceptance criteria.
+   - Tests in `tests/test_planning_justification.py` pass.
 
 4. ~~Add class-level mastery signal endpoints/UI.~~ ✅ Done.
    - `app/api/mastery.py` with list, create, and summary endpoints.
@@ -159,7 +162,6 @@ Highest priority:
 
 ## Suggested Next Task
 
-Improve the "why is this scheduled here?" acceptance criterion. The UI
-can show a schedule, but a complete justification should include:
-prerequisite dependency, objective, source pages, emphasis weight, and
-time-to-exam.
+Add linting and type checking to the project with ruff and mypy.
+Currently only ruff is in dev dependencies; mypy and type stubs would
+catch the kind of type mismatches that only surface at runtime.

@@ -32,6 +32,10 @@ class FakeResult:
 
         return _ScalarResult(self._rows)
 
+    def first(self):
+        """Return the first row, or None."""
+        return self._rows[0] if self._rows else None
+
     def scalar(self):
         """Return the first column of the first row, or None.
         For aggregate queries (select(func.count(...))), the stored row
@@ -116,10 +120,10 @@ class FakeSession:
         order_by_clauses = list(getattr(stmt, "_order_by_clauses", ()))
 
         # Check for joins
-        join_info = _extract_join(stmt)
+        joins = getattr(stmt, "_setup_joins", ())
 
-        if join_info:
-            return _execute_join(self, select_entities, join_info, where_clauses)
+        if joins:
+            return _execute_joins(self, select_entities, joins, where_clauses)
 
         if not select_entities:
             return FakeResult([])
@@ -174,15 +178,17 @@ def _extract_select_entities(stmt):
     return entities
 
 
-def _extract_join(stmt):
-    """Extract join information from a select() statement."""
-    joins = getattr(stmt, "_setup_joins", [])
-    if not joins:
-        return None
-    # joins is list of (join_target, onclause, isouter, full)
-    target = joins[0][0]
-    onclause = joins[0][1]
-    return {"target": target, "onclause": onclause}
+def _resolve_model(session, target):
+    """Resolve a SQLAlchemy Table/AnnotatedTable to a model class."""
+    target_tablename = (
+        target if isinstance(target, str)
+        else getattr(target, "name", None)
+    )
+    if target_tablename and not isinstance(target, type):
+        for model_cls in session._rows:
+            if getattr(model_cls, "__tablename__", None) == target_tablename:
+                return model_cls
+    return target
 
 
 def _apply_clause(rows, clause):
@@ -317,84 +323,87 @@ def _extract_in_values(right):
     return []
 
 
-def _execute_join(session, select_entities, join_info, where_clauses):
-    """Execute a join query across two models."""
+def _execute_joins(session, select_entities, joins, where_clauses):
+    """Execute a multi-table join query progressively.
+
+    Each join adds one more entity to the tuple.  ``_setup_joins`` is a
+    tuple of ``(target, onclause, isouter, full)`` entries in join order.
+    """
+    # Start with rows from the first (primary) entity
     primary = select_entities[0]
-    secondary_name = join_info["target"]  # may be table name string or Table object
-    # Resolve to actual model class
-    secondary = secondary_name
-    # Try to get the table name from the target (could be str or Table/AnnotatedTable)
-    target_tablename = (
-        secondary_name if isinstance(secondary_name, str)
-        else getattr(secondary_name, "name", None)
-    )
-    if target_tablename and not isinstance(secondary_name, type):
-        for model_cls in session._rows:
-            if getattr(model_cls, "__tablename__", None) == target_tablename:
-                secondary = model_cls
-                break
-
     primary_rows = list(session._rows.get(primary, []))
-    secondary_rows = list(session._rows.get(secondary, []))
+    # Each row in `joined` is a tuple of objects, one per entity so far
+    joined = [(p,) for p in primary_rows]
 
-    # Determine join column names from onclause
-    # The onclause may be: Secondary.id == Primary.foreign_key
-    # or: Primary.foreign_key == Secondary.id
-    onclause = join_info["onclause"]
-    left_name = _get_column_name(onclause.left)
-    right_name = _get_column_name(onclause.right)
+    # Collect all model classes involved so far
+    models_so_far = [primary]
 
-    # Figure out which side belongs to which entity
-    left_table = getattr(onclause.left, "table", None)
-    right_table = getattr(onclause.right, "table", None)
+    for target, onclause, _isouter, _full in joins:
+        secondary = _resolve_model(session, target)
+        secondary_rows = list(session._rows.get(secondary, []))
 
-    # Determine primary_col and secondary_col
-    primary_col = None
-    secondary_col = None
-    if left_table is not None and right_table is not None:
-        left_tablename = getattr(left_table, "name", None)
-        right_tablename = getattr(right_table, "name", None)
-        primary_tablename = getattr(primary, "__tablename__", None)
-        if left_tablename == primary_tablename:
-            primary_col, secondary_col = left_name, right_name
+        # Determine join columns from onclause
+        left_name = _get_column_name(onclause.left)
+        right_name = _get_column_name(onclause.right)
+        left_table = getattr(onclause.left, "table", None)
+        right_table = getattr(onclause.right, "table", None)
+
+        # Figure out which side belongs to which entity
+        primary_col = None
+        foreign_col = None
+        if left_table is not None and right_table is not None:
+            left_tn = getattr(left_table, "name", None)
+            right_tn = getattr(right_table, "name", None)
+            primary_tn = getattr(primary, "__tablename__", None)
+            if left_tn == primary_tn:
+                primary_col, foreign_col = left_name, right_name
+            else:
+                primary_col, foreign_col = right_name, left_name
         else:
-            primary_col, secondary_col = right_name, left_name
-    else:
-        # Fallback: assume left=secondary, right=primary (FK pattern)
-        primary_col, secondary_col = right_name, left_name
+            primary_col, foreign_col = right_name, left_name
 
-    # Build joined pairs
-    joined = []
-    for p in primary_rows:
-        if primary_col and secondary_col:
-            join_val = getattr(p, primary_col, None)
-            for s in secondary_rows:
-                if getattr(s, secondary_col, None) == join_val:
-                    joined.append((p, s))
-        else:
-            for s in secondary_rows:
-                joined.append((p, s))
+        # Build new joined tuples
+        new_joined = []
+        for existing in joined:
+            # existing is (entity0, entity1, ...)
+            # Find which entity in the chain matches the right side's table
+            ref_entity = existing[-1]  # default: last entity
+            if right_table is not None:
+                ref_tn = getattr(right_table, "name", None)
+                for i, m in enumerate(models_so_far):
+                    if getattr(m, "__tablename__", None) == ref_tn:
+                        ref_entity = existing[i]
+                        break
+            if primary_col and foreign_col:
+                join_val = getattr(ref_entity, primary_col, None)
+                for s in secondary_rows:
+                    if getattr(s, foreign_col, None) == join_val:
+                        new_joined.append(existing + (s,))
+            else:
+                for s in secondary_rows:
+                    new_joined.append(existing + (s,))
+        joined = new_joined
+        models_so_far.append(secondary)
 
     # Apply where clauses — determine which entity each clause references
-    primary_tablename_check = getattr(primary, "__tablename__", None)
-    secondary_tablename_check = getattr(secondary, "__tablename__", None)
     for clause in where_clauses:
-        # Find which table this clause references
         ref_table = _clause_references_table(clause)
         new_joined = []
-        for pair in joined:
-            if ref_table == primary_tablename_check:
-                if _apply_clause([pair[0]], clause):
-                    new_joined.append(pair)
-            elif ref_table == secondary_tablename_check:
-                if _apply_clause([pair[1]], clause):
-                    new_joined.append(pair)
+        for tup in joined:
+            # Find which position matches the referenced table
+            matched = False
+            for i, m in enumerate(models_so_far):
+                if getattr(m, "__tablename__", None) == ref_table:
+                    if _apply_clause([tup[i]], clause):
+                        matched = True
+                    break
             else:
-                # Unknown table — apply to primary as fallback
-                if _apply_clause([pair[0]], clause):
-                    new_joined.append(pair)
+                # Unknown table — apply to first entity as fallback
+                matched = bool(_apply_clause([tup[0]], clause))
+            if matched:
+                new_joined.append(tup)
         joined = new_joined
 
     if len(select_entities) == 1:
-        return FakeResult([j[0] for j in joined])
+        return FakeResult([t[0] for t in joined])
     return FakeResult(joined)

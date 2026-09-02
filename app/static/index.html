@@ -620,6 +620,7 @@ a { color: var(--accent); }
           </div>
           <div class="actions"><button class="go" id="btn-plan">Build plan</button></div>
           <div class="readout" id="out-plan"></div>
+          <div class="readout" id="out-justification"></div>
         </div>
       </div>
     </section>
@@ -650,6 +651,7 @@ a { color: var(--accent); }
         <div class="panel-body">
           <div class="actions" style="margin-top:0"><button class="go" id="btn-replan">Replan</button></div>
           <div class="readout" id="out-replan"></div>
+          <div class="readout" id="out-justification-replan"></div>
         </div>
       </div>
     </section>
@@ -1149,7 +1151,8 @@ $('btn-plan').onclick = async () => {
   } catch (e) { failed(el, e); }
 };
 
-async function schedule(el, planId) {
+async function schedule(el, planId, justTarget) {
+  const jTarget = justTarget || 'out-justification';
   try {
     const rows = await api(`/planning/plans/${planId}`);
     if (el) el.insertAdjacentHTML('beforeend', table(rows, [
@@ -1157,9 +1160,56 @@ async function schedule(el, planId) {
       { h: 'Lesson', f: r => esc(r.node_label) },
       { h: 'Minutes', right: true, cls: 'num-col', f: r => r.scheduled_minutes },
       { h: 'Status', f: r => `<span class="chip">${esc(r.status)}</span>` },
+      { h: '', f: r => `<button class="quiet" onclick="showJustification('${planId}','${r.id}','${jTarget}')" style="font-size:.72rem">why?</button>` },
     ]));
     fillSelect($('gen-unit'), rows, r => `${r.date} — ${r.node_label}`);
   } catch {}
+}
+
+async function showJustification(planId, unitId, targetId) {
+  const el = $(targetId || 'out-justification');
+  if (!el) return;
+  working(el, 'Loading justification');
+  try {
+    const j = await api(`/planning/plans/${planId}/units/${unitId}/justification`);
+    let html = `<div class="panel" style="margin-top:.8rem"><div class="panel-head"><h3>${esc(j.node_label)}</h3>`;
+    if (j.syllabus_ref) html += ` <span class="chip info">${esc(j.syllabus_ref)}</span>`;
+    if (j.was_moved) html += ` <span class="chip warn">moved from ${esc(String(j.previous_date))}</span>`;
+    html += `</div><div class="panel-body">`;
+    if (j.node_description) html += `<p style="margin:0 0 .8rem;color:var(--ink-soft)">${esc(j.node_description)}</p>`;
+    // Time context
+    if (j.days_to_term_end != null) {
+      html += `<div style="margin-bottom:.8rem"><span class="chip info">${j.days_to_term_end} days to term end</span> `;
+      html += `<span class="chip">${j.scheduled_minutes} min on ${j.date}</span></div>`;
+    }
+    // Prerequisites
+    if (j.prerequisites.length) {
+      html += `<div style="margin-bottom:.8rem"><span style="font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-faint)">Prerequisites</span><ul style="margin:.3rem 0 0;padding-left:1.2rem">`;
+      j.prerequisites.forEach(p => { html += `<li>${esc(p.node_label)}</li>`; });
+      html += `</ul></div>`;
+    }
+    // Emphasis
+    if (j.emphasis_score != null) {
+      html += `<div style="margin-bottom:.8rem"><span style="font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-faint)">Emphasis score: ${j.emphasis_score.toFixed(3)}</span>`;
+      html += `<div style="display:flex;gap:.8rem;margin-top:.3rem;flex-wrap:wrap">`;
+      const comps = [
+        ['frequency', j.emphasis_frequency], ['recency', j.emphasis_recency],
+        ['marks', j.emphasis_marks], ['syllabus', j.emphasis_syllabus], ['structural', j.emphasis_structural],
+      ];
+      comps.forEach(([label, val]) => {
+        if (val != null) html += `<span class="num" style="font-size:.78rem">${label}: ${val.toFixed(2)}</span>`;
+      });
+      html += `</div></div>`;
+    }
+    // Source pages
+    if (j.source_pages.length) {
+      html += `<div><span style="font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-faint)">Source pages</span><ul style="margin:.3rem 0 0;padding-left:1.2rem">`;
+      j.source_pages.forEach(s => { html += `<li><b>${esc(s.document_title)}</b> p.${s.page} — <span style="color:var(--ink-soft)">${esc(s.excerpt.slice(0, 120))}${s.excerpt.length > 120 ? '…' : ''}</span></li>`; });
+      html += `</ul></div>`;
+    }
+    html += `</div></div>`;
+    el.innerHTML = html;
+  } catch (e) { failed(el, e); }
 }
 
 async function planDiff(planId) {
@@ -1221,7 +1271,7 @@ $('btn-replan').onclick = async () => {
       { v: plan.unscheduled_unit_ids.length, l: 'dropped', kind: plan.unscheduled_unit_ids.length ? 'crit' : 'ok' },
     ]) + '<p class="aside">The first figure is the one that matters. A replan is judged by how little it disturbs.</p>';
     el.insertAdjacentHTML('beforeend', await planDiff(plan.plan_version_id));
-    await schedule(el, plan.plan_version_id); ledger();
+    await schedule(el, plan.plan_version_id, 'out-justification-replan'); ledger();
   } catch (e) { failed(el, e); }
 };
 
