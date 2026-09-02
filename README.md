@@ -41,19 +41,25 @@ A teacher workspace at `/` walks all ten stages in order.
 4. Verification must use a different provider/model than generation. A model does not grade its own homework; this is enforced at call time, not just in config.
 5. Minimizing replan churn is a first-class scheduling objective, not an afterthought.
 
-## Local development
+## Quick start (hackathon demo)
 
-Requires Docker (for Postgres + pgvector) and Python 3.11+.
+Requires Docker and Python 3.11+.
 
 ```bash
-cp .env.example .env          # fill in provider API keys
+cp .env.example .env          # fill in at least DATABASE_URL
 docker compose up -d db
-pip install -e ".[dev]"       # fast local app + tests, text-layer PDF parsing
+pip install -e ".[dev]"       # lightweight: app + tests + linting
 alembic upgrade head
 uvicorn app.main:app --reload
 ```
 
-Then open <http://localhost:8000> for the workspace, or `/docs` for the API.
+Then run the self-contained demo (generates PDFs in memory, no external files needed):
+
+```bash
+python scripts/demo_seed.py   # exercises all 10 pipeline stages
+```
+
+Or open <http://localhost:8000> and walk the workspace manually.
 
 Optional integrations are split out so a fresh setup does not download every
 OCR, worker, and cloud-provider dependency before the app can boot:
@@ -86,10 +92,12 @@ Only `DATABASE_URL` is strictly required. Every provider key is optional — the
 ## Testing
 
 ```bash
-python -m pytest -q
+python -m pytest -q            # 164 tests, <6 seconds
+python -m ruff check app/ tests/   # lint
+python -m mypy app/api/planning.py app/planning/service.py --ignore-missing-imports  # type check
 ```
 
-The pure logic — scheduler, ensemble signals, claim parsing, question-ref parsing, emphasis scoring, curriculum extraction parsing — is unit-tested without a database or a provider. DB-touching paths are exercised against a real Postgres, skipped when one isn't configured.
+Tests cover: pure logic (scheduler, signals, claim parsing, question-ref, emphasis, curriculum extraction), service orchestration (FakeSession with real SQLAlchemy queries), and API endpoints (Starlette TestClient). No database or provider keys required to run the full suite.
 
 ## Repo layout
 
