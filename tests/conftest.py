@@ -353,7 +353,6 @@ def _execute_joins(session, select_entities, joins, where_clauses):
         foreign_col = None
         if left_table is not None and right_table is not None:
             left_tn = getattr(left_table, "name", None)
-            right_tn = getattr(right_table, "name", None)
             primary_tn = getattr(primary, "__tablename__", None)
             if left_tn == primary_tn:
                 primary_col, foreign_col = left_name, right_name

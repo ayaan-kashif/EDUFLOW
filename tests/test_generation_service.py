@@ -27,12 +27,12 @@ from app.domain.models import (
     VerificationStatus,
 )
 from app.generation import service as service_module
+from app.generation.claims import GeneratedClaim
 from app.generation.service import (
     AssessmentGenerationService,
     LessonGenerationService,
     _verify_claim,
 )
-from app.generation.claims import GeneratedClaim
 from app.providers.base import LLMResponse, ProviderError
 
 
@@ -334,6 +334,5 @@ async def test_empty_completion_is_a_provider_error_not_an_empty_answer():
 
     with patch.object(
         provider._client.chat.completions, "create", AsyncMock(return_value=Response())
-    ):
-        with pytest.raises(ProviderError, match="empty completion"):
-            await provider.complete([LLMMessage(role="user", content="hi")])
+    ), pytest.raises(ProviderError, match="empty completion"):
+        await provider.complete([LLMMessage(role="user", content="hi")])

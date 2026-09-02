@@ -7,8 +7,9 @@ themselves should be thin SDK wrappers with no resilience logic of their own.
 
 import logging
 import time
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Awaitable, Callable, Generic, TypeVar
+from typing import Generic, TypeVar
 
 from tenacity import (
     retry,

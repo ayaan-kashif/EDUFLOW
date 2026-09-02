@@ -1,8 +1,6 @@
 import uuid
 from datetime import date, timedelta
 
-import pytest
-
 from app.planning.scheduler import (
     Assignment,
     UnitInput,

@@ -8,6 +8,7 @@ import uuid
 
 import pytest
 
+from app.domain.models import SourceSpan
 from app.generation.claims import (
     ClaimParseError,
     Verdict,
@@ -15,7 +16,6 @@ from app.generation.claims import (
     parse_verification_result,
 )
 from app.generation.retrieval import ScoredSpan, lexical_overlap, rank_spans
-from app.domain.models import SourceSpan
 
 
 def test_parse_generated_claims_happy_path():

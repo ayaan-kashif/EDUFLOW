@@ -20,7 +20,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.models import CurriculumNode, ExamQuestion, MappingMethod, QuestionNodeMapping
 from app.llm_json import loads_llm_json
-from app.mapping.signals import SignalScores, combine, cosine_similarity, lexical_overlap, terminology_match
+from app.mapping.signals import (
+    SignalScores,
+    combine,
+    cosine_similarity,
+    lexical_overlap,
+    terminology_match,
+)
 from app.providers.base import LLMMessage, ProviderError
 
 logger = logging.getLogger(__name__)

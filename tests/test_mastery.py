@@ -5,7 +5,7 @@ that don't need a database session.
 """
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from app.api.mastery import _latest_per_node
 
@@ -22,7 +22,7 @@ class _FakeSignal:
 
 
 def _ts(year, month, day, hour=0, minute=0):
-    return datetime(year, month, day, hour, minute, tzinfo=timezone.utc)
+    return datetime(year, month, day, hour, minute, tzinfo=UTC)
 
 
 def test_latest_per_node_returns_most_recent():

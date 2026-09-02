@@ -5,10 +5,9 @@ it calls the parser, persists a SourceDocument, and persists SourceSpan
 rows — all verified against a FakeSession.
 """
 
-import uuid
 from dataclasses import dataclass
 
-from app.domain.models import DocType, SourceDocument, SourceSpan
+from app.domain.models import DocType, SourceSpan
 from app.ingestion.service import IngestionService
 from app.providers.base import ParsedDocument
 from tests.conftest import FakeSession

@@ -6,7 +6,7 @@ file — this is where that provenance chain starts.
 """
 
 import hashlib
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Protocol
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -50,7 +50,7 @@ class IngestionService:
             title=title,
             doc_type=doc_type,
             file_path=file_path,
-            ingested_at=datetime.now(timezone.utc),
+            ingested_at=datetime.now(UTC),
             parser_used=parsed.parser_name,
             parser_confidence=parsed.parser_confidence,
         )

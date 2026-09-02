@@ -18,8 +18,6 @@ import logging
 from dataclasses import dataclass
 from uuid import UUID
 
-from app.llm_json import loads_llm_json
-
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -31,6 +29,7 @@ from app.domain.models import (
     Origin,
     SourceSpan,
 )
+from app.llm_json import loads_llm_json
 from app.providers.base import LLMMessage, ProviderError
 
 logger = logging.getLogger(__name__)

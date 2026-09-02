@@ -27,7 +27,7 @@ out of scope for this prototype.
 """
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date as date_
 from uuid import UUID
 

@@ -8,8 +8,7 @@ from app.domain.models import (
     Origin,
     QuestionNodeMapping,
 )
-from app.mapping.mapper import EnsembleMapper, MappingCandidate
-from app.mapping.mapper import _llm_scores
+from app.mapping.mapper import EnsembleMapper, MappingCandidate, _llm_scores
 from app.mapping.signals import SignalScores
 from app.providers.base import LLMResponse
 

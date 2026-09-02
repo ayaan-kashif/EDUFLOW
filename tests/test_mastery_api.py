@@ -5,13 +5,10 @@ with canned CurriculumNode and ClassMasterySignal rows.
 """
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from app.api.mastery import (
     _latest_per_node,
-    create_mastery_signal,
-    list_mastery_signals,
-    mastery_summary,
 )
 from app.domain.models import (
     ClassMasterySignal,
@@ -41,7 +38,7 @@ def _signal(class_id, node_id, status, teacher="demo-teacher"):
         status=status,
         marked_by=teacher,
     )
-    s.created_at = datetime.now(timezone.utc)
+    s.created_at = datetime.now(UTC)
     return s
 
 
@@ -51,9 +48,9 @@ def _signal(class_id, node_id, status, teacher="demo-teacher"):
 def test_latest_per_node_returns_most_recent():
     node = uuid.uuid4()
     old = _signal("CS-4A", node, MasteryStatus.RETEACH)
-    old.created_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    old.created_at = datetime(2026, 1, 1, tzinfo=UTC)
     new = _signal("CS-4A", node, MasteryStatus.MASTERED)
-    new.created_at = datetime(2026, 1, 5, tzinfo=timezone.utc)
+    new.created_at = datetime(2026, 1, 5, tzinfo=UTC)
 
     result = _latest_per_node([old, new])
     assert len(result) == 1
@@ -75,18 +72,18 @@ def test_latest_per_node_separates_classes():
 async def test_list_mastery_signals_returns_latest_per_node():
     node = _node("Arrays")
     old = _signal("CS-4A", node.id, MasteryStatus.RETEACH)
-    old.created_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    old.created_at = datetime(2026, 1, 1, tzinfo=UTC)
     new = _signal("CS-4A", node.id, MasteryStatus.MASTERED)
-    new.created_at = datetime(2026, 1, 5, tzinfo=timezone.utc)
+    new.created_at = datetime(2026, 1, 5, tzinfo=UTC)
 
     session = FakeSession({
         ClassMasterySignal: [old, new],
         CurriculumNode: [node],
     })
 
-    from fastapi import Query
-    from starlette.testclient import TestClient
     from fastapi import FastAPI
+    from starlette.testclient import TestClient
+
     from app.api.mastery import router
 
     app = FastAPI()
@@ -113,6 +110,7 @@ async def test_list_mastery_signals_empty_class():
 
     from fastapi import FastAPI
     from starlette.testclient import TestClient
+
     from app.api.mastery import router
     from app.db import get_session
 
@@ -137,6 +135,7 @@ async def test_create_mastery_signal_persists_and_returns():
 
     from fastapi import FastAPI
     from starlette.testclient import TestClient
+
     from app.api.mastery import router
     from app.db import get_session
 
@@ -166,6 +165,7 @@ async def test_create_mastery_signal_unknown_node_returns_404():
 
     from fastapi import FastAPI
     from starlette.testclient import TestClient
+
     from app.api.mastery import router
     from app.db import get_session
 
@@ -203,6 +203,7 @@ async def test_mastery_summary_counts_by_status():
 
     from fastapi import FastAPI
     from starlette.testclient import TestClient
+
     from app.api.mastery import router
     from app.db import get_session
 

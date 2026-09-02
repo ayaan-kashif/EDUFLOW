@@ -17,8 +17,11 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
-from app.domain.models import DocType, SourceDocument, SourceSpan, TeachingUnit
-from app.ingestion.curriculum_extraction import CurriculumExtractionError, CurriculumExtractionService
+from app.domain.models import DocType, SourceSpan, TeachingUnit
+from app.ingestion.curriculum_extraction import (
+    CurriculumExtractionError,
+    CurriculumExtractionService,
+)
 from app.ingestion.question_service import IngestQuestionsReport, QuestionIngestionService
 from app.ingestion.service import IngestionService
 from app.mapping.embedding_backfill import backfill_node_embeddings

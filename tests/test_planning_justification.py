@@ -87,6 +87,7 @@ def _scheduled(unit, window, plan_version):
 def _test_app(session):
     """Create a minimal FastAPI app with the planning router."""
     from fastapi import FastAPI
+
     from app.api.planning import router
     from app.db import get_session
 

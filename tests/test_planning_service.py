@@ -6,7 +6,6 @@ that the planning service correctly reads from and writes to the session
 during orchestration.
 """
 
-import asyncio
 import uuid
 from datetime import date, time
 
@@ -18,7 +17,6 @@ from app.domain.models import (
     InstructionWindow,
     NodeType,
     Origin,
-    PlanVersion,
     ScheduledUnit,
     ScheduledUnitStatus,
     TeachingUnit,
@@ -28,8 +26,6 @@ from app.planning.service import (
     _load_units,
     _load_windows,
     _previous_assignment,
-    diff_schedules,
-    ScheduledUnitSnapshot,
 )
 from tests.conftest import FakeSession
 

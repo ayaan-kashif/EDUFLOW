@@ -36,9 +36,6 @@ from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     ARRAY,
     CheckConstraint,
-)
-from sqlalchemy import Enum as SAEnum
-from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
@@ -48,8 +45,9 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
+from sqlalchemy import Enum as SAEnum
 from sqlalchemy.dialects.postgresql import JSONB, UUID
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 
 from app.domain.base import Base, CreatedAtMixin, UUIDPk
 
