@@ -48,12 +48,26 @@ Requires Docker (for Postgres + pgvector) and Python 3.11+.
 ```bash
 cp .env.example .env          # fill in provider API keys
 docker compose up -d db
-pip install -e ".[dev]"
+pip install -e ".[dev]"       # fast local app + tests, text-layer PDF parsing
 alembic upgrade head
 uvicorn app.main:app --reload
 ```
 
 Then open <http://localhost:8000> for the workspace, or `/docs` for the API.
+
+Optional integrations are split out so a fresh setup does not download every
+OCR, worker, and cloud-provider dependency before the app can boot:
+
+```bash
+pip install -e ".[parsing]"   # docling + anydoc for richer document parsing
+pip install -e ".[cloud]"     # Anthropic provider support
+pip install -e ".[workers]"   # Celery + Redis worker dependencies
+pip install -e ".[full]"      # everything above plus dev tools
+```
+
+The default install still includes local/Ollama-compatible LLM support through
+the OpenAI-compatible SDK, Postgres/pgvector support, pypdf text-layer parsing,
+and the OR-Tools scheduler.
 
 ## Providers
 

@@ -15,8 +15,10 @@ the whole repository. Keep it updated after each major change.
 - Minimal runtime dependencies were installed into the bundled Codex Python:
   FastAPI, Uvicorn, SQLAlchemy, AsyncPG, Psycopg, pgvector, Pydantic Settings,
   PyYAML, Tenacity, HTTPX, python-multipart, Alembic, and OR-Tools.
-- Full `pip install -e ".[dev]"` was not completed because the `docling`/OCR
-  dependency tree was too slow/heavy in this environment.
+- Dependency groups have been split so `pip install -e ".[dev]"` stays
+  lightweight. Heavy parsing, cloud-provider, and worker packages are available
+  through explicit extras.
+- Lightweight dev install was verified with `pip install -e ".[dev]"`.
 
 ## Implemented Product Areas
 
@@ -84,6 +86,10 @@ the whole repository. Keep it updated after each major change.
 - Auto-shortlist embedding failures in mapping return an actionable `400`.
 - Assessment generation count is constrained to `1..50`.
 - Mapping correction weights are validated as numeric values in `0..1`.
+- Optional LLM and parser provider modules are imported lazily, so missing
+  optional packages do not break app startup.
+- Heavy dependencies were moved out of the default install into extras:
+  `parsing`, `cloud`, `workers`, and `full`.
 
 ## Verification Status
 
@@ -94,42 +100,37 @@ the whole repository. Keep it updated after each major change.
   - `/` returned the teacher workspace HTML
   - `/docs` returned the OpenAPI UI
   - `/stats` returned DB-backed counts
-- Full pytest was not run after all work because the environment initially
-  lacked pytest and the full editable install did not complete.
+- Full lightweight test suite passes with `137 passed, 1 skipped`.
+- One pytest cache warning remains in the Codex sandbox because writing under
+  `.pytest_cache` was denied; it does not affect test results.
 
 ## Known Gaps / Next Work
 
 Highest priority:
 
-1. Finish a reliable dev setup path.
-   - Either split optional heavy parser dependencies into an extra, or document
-     a minimal runtime install separately from full OCR/docling support.
-   - Add a lightweight install command for running tests that do not need
-     docling.
-
-2. Run the full test suite in a proper Python 3.11+ environment.
+1. Run the full test suite in a proper Python 3.11+ environment.
    - The bundled runtime is Python 3.12.
    - `pyproject.toml` allows Python `>=3.11`, so this may be fine, but the
      project docs say Python 3.11+ and should be tested intentionally.
 
-3. Add endpoint/service tests for DB orchestration.
+2. Add endpoint/service tests for DB orchestration.
    - Current tests are mostly pure logic and fake-session tests.
    - Live Postgres coverage is intentionally sparse.
 
-4. Improve the "why is this scheduled here?" acceptance criterion.
+3. Improve the "why is this scheduled here?" acceptance criterion.
    - The UI can show a schedule, but a complete justification should include:
      prerequisite dependency, objective, source pages, emphasis weight, and
      time-to-exam.
 
-5. Add class-level mastery signal endpoints/UI.
+4. Add class-level mastery signal endpoints/UI.
    - The data model exists, but the teacher workflow for marking mastered /
      needs reinforcement / reteach is not fully exposed.
 
-6. Add plan-diff endpoint.
+5. Add plan-diff endpoint.
    - Replanning returns unchanged/moved counts, but there is no rich API yet for
      "old date -> new date" lesson diffs.
 
-7. Add real demo seeding / one-command demo path.
+6. Add real demo seeding / one-command demo path.
    - A sample syllabus exists under `demo/`, and one document was present in
      the local database during verification, but the repo needs a robust demo
      script that can seed enough data to exercise all ten stages.
@@ -146,7 +147,6 @@ Highest priority:
 
 ## Suggested Next Task
 
-Start with the development setup gap. The project is usable locally only after
-installing a custom subset of dependencies. Turn that into an explicit supported
-path, then run the lightweight test suite. After that, add the plan-diff API and
-wire it into the replan stage of the UI.
+Add the plan-diff API and wire it into the replan stage of the UI. That closes
+one of the most visible MVP acceptance gaps: showing exactly what moved after a
+calendar disruption.

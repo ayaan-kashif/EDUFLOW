@@ -1,26 +1,69 @@
 import logging
+from collections.abc import Callable
 
 from app.config import Settings, get_provider_config, get_settings
-from app.providers.llm.anthropic_provider import AnthropicLLMProvider
-from app.providers.llm.fireworks_provider import FireworksLLMProvider
-from app.providers.llm.groq_provider import GroqLLMProvider
-from app.providers.llm.ollama_provider import OllamaLLMProvider, OllamaVerifyLLMProvider
-from app.providers.llm.openai_provider import OpenAILLMProvider
-from app.providers.llm.openrouter_provider import OpenRouterLLMProvider
-from app.providers.llm.together_provider import TogetherLLMProvider
 from app.providers.router import FallbackChain, ProviderRouter
 
 logger = logging.getLogger(__name__)
 
-_LLM_PROVIDERS = {
-    "anthropic": AnthropicLLMProvider,
-    "openai": OpenAILLMProvider,
-    "groq": GroqLLMProvider,
-    "openrouter": OpenRouterLLMProvider,
-    "together": TogetherLLMProvider,
-    "fireworks": FireworksLLMProvider,
-    "ollama": OllamaLLMProvider,
-    "ollama_verify": OllamaVerifyLLMProvider,
+
+def _anthropic_provider():
+    from app.providers.llm.anthropic_provider import AnthropicLLMProvider
+
+    return AnthropicLLMProvider
+
+
+def _openai_provider():
+    from app.providers.llm.openai_provider import OpenAILLMProvider
+
+    return OpenAILLMProvider
+
+
+def _groq_provider():
+    from app.providers.llm.groq_provider import GroqLLMProvider
+
+    return GroqLLMProvider
+
+
+def _openrouter_provider():
+    from app.providers.llm.openrouter_provider import OpenRouterLLMProvider
+
+    return OpenRouterLLMProvider
+
+
+def _together_provider():
+    from app.providers.llm.together_provider import TogetherLLMProvider
+
+    return TogetherLLMProvider
+
+
+def _fireworks_provider():
+    from app.providers.llm.fireworks_provider import FireworksLLMProvider
+
+    return FireworksLLMProvider
+
+
+def _ollama_provider():
+    from app.providers.llm.ollama_provider import OllamaLLMProvider
+
+    return OllamaLLMProvider
+
+
+def _ollama_verify_provider():
+    from app.providers.llm.ollama_provider import OllamaVerifyLLMProvider
+
+    return OllamaVerifyLLMProvider
+
+
+_LLM_PROVIDERS: dict[str, Callable[[], type]] = {
+    "anthropic": _anthropic_provider,
+    "openai": _openai_provider,
+    "groq": _groq_provider,
+    "openrouter": _openrouter_provider,
+    "together": _together_provider,
+    "fireworks": _fireworks_provider,
+    "ollama": _ollama_provider,
+    "ollama_verify": _ollama_verify_provider,
 }
 
 
@@ -28,14 +71,14 @@ def _build_chain(capability: str, settings: Settings) -> FallbackChain:
     config = get_provider_config()["llm"][capability]
     routers: list[tuple[str, ProviderRouter]] = []
     for name in config["priority"]:
-        provider_cls = _LLM_PROVIDERS[name]
         try:
+            provider_cls = _LLM_PROVIDERS[name]()
             provider = provider_cls(settings)
-        except ValueError:
-            # No API key configured for this provider — skip it rather
-            # than fail the whole chain. Not a runtime provider failure,
-            # so it isn't logged as a warning.
-            logger.debug("llm.%s: skipping %s, not configured", capability, name)
+        except (ImportError, ValueError) as exc:
+            # Optional provider dependency missing or no API key
+            # configured — skip it rather than fail the whole chain. Not a
+            # runtime provider failure, so it isn't logged as a warning.
+            logger.debug("llm.%s: skipping %s: %s", capability, name, exc)
             continue
         routers.append(
             (
