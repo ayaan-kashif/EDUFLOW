@@ -101,7 +101,7 @@ the whole repository. Keep it updated after each major change.
   - `/` returned the teacher workspace HTML
   - `/docs` returned the OpenAPI UI
   - `/stats` returned DB-backed counts
-- Full lightweight test suite passes with `143 passed, 1 skipped`.
+- Full lightweight test suite passes with `161 passed, 1 skipped`.
 - Python 3.14 local environment verified; tests pass despite project docs
   saying 3.11+.
 
@@ -114,9 +114,15 @@ Highest priority:
    - `pyproject.toml` allows Python `>=3.11`, so this may be fine, but the
      project docs say Python 3.11+ and should be tested intentionally.
 
-2. Add endpoint/service tests for DB orchestration.
-   - Current tests are mostly pure logic and fake-session tests.
-   - Live Postgres coverage is intentionally sparse.
+2. ~~Add endpoint/service tests for DB orchestration.~~ ✅ Done.
+   - `tests/conftest.py`: FakeSession handles real SQLAlchemy select/where/
+     in_/join/order_by patterns against in-memory rows.
+   - `tests/test_planning_service.py`: 8 tests covering _load_units,
+     _load_windows (with join), _previous_assignment, and full build_plan.
+   - `tests/test_mastery_api.py`: 7 tests covering list, create, summary
+     endpoints and the _latest_per_node pure logic.
+   - `tests/test_ingestion_service_db.py`: 3 tests covering document and
+     span persistence with a fake parser.
 
 3. Improve the "why is this scheduled here?" acceptance criterion.
    - The UI can show a schedule, but a complete justification should include:
@@ -153,6 +159,7 @@ Highest priority:
 
 ## Suggested Next Task
 
-Add endpoint/service tests for DB-backed orchestration. Current tests are
-mostly pure logic and fake-session tests. Live Postgres coverage is
-intentionally sparse but needed before a production deploy.
+Improve the "why is this scheduled here?" acceptance criterion. The UI
+can show a schedule, but a complete justification should include:
+prerequisite dependency, objective, source pages, emphasis weight, and
+time-to-exam.
