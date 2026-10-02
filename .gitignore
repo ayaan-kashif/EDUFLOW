@@ -18,5 +18,11 @@ build/
 .DS_Store
 .idea/
 .vscode/
-.claude/
+.claude/uploads/
+
+curriculumos.db
+curriculumos.db-wal
+curriculumos.db-shm
+.runtime/
 uploads/
+demo_offline.db

@@ -55,7 +55,7 @@ def cosine_similarity(a: list[float], b: list[float]) -> float:
     # Cosine similarity ranges [-1, 1]; embeddings of relevant text pairs
     # are near-orthogonal at worst in practice, but clamp defensively so
     # this never drags a combined score negative.
-    return max(0.0, dot / (norm_a * norm_b))
+    return float(max(0.0, dot / (norm_a * norm_b)))
 
 
 @dataclass
@@ -78,7 +78,7 @@ class SignalScores:
         }
 
 
-def combine(scores: SignalScores) -> tuple[float, float]:
+def combine(scores: SignalScores, weights: dict[str,float] | None = None) -> tuple[float, float]:
     """Returns (weight, confidence) for a QuestionNodeMapping row.
 
     weight = confidence = the mean of whatever signals ran. They're the
@@ -91,5 +91,9 @@ def combine(scores: SignalScores) -> tuple[float, float]:
     present = scores.present()
     if not present:
         return 0.0, 0.0
-    value = sum(present.values()) / len(present)
+    active = {name:max(0,(weights or {}).get(name,1)) for name in present}
+    denominator = sum(active.values())
+    if denominator <= 0:
+        return 0.0,0.0
+    value = sum(score*active[name] for name,score in present.items()) / denominator
     return value, value

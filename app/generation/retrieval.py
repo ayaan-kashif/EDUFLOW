@@ -4,16 +4,16 @@
 Given a curriculum node, shortlist the SourceSpan rows most likely to
 support claims about it.
 
-# ponytail: lexical (token-overlap) scoring only. SourceSpan has no
-# embedding column — adding one is a schema change (new migration) outside
-# this pass's scope. Upgrade path: add an embedding column + pgvector index
-# on source_spans, mirror app/mapping/retrieval.py's top_k_similar_nodes
-# shape, and blend it with this lexical score (hybrid retrieval per
-# 02_ARCHITECTURE.md §4).
+Lexical retrieval shortlists at most 20 spans, then the configured embedding
+provider reranks with a 40/60 lexical/semantic blend. A four-second latency
+budget falls back to lexical retrieval. Stored span-vector indexing remains a
+future optimization; corpus scanning is capped at 2,000 spans for the pilot.
 """
 
 from __future__ import annotations
 
+import asyncio
+import logging
 import re
 from dataclasses import dataclass
 
@@ -21,6 +21,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.models import CurriculumEdge, CurriculumNode, SourceSpan
+from app.mapping.signals import cosine_similarity
+
+logger = logging.getLogger(__name__)
 
 _TOKEN_RE = re.compile(r"[a-z0-9]+")
 
@@ -82,16 +85,47 @@ async def _candidate_spans(session: AsyncSession, node: CurriculumNode) -> list[
         if spans:
             return spans
 
-    result = await session.execute(select(SourceSpan))
+    result = await session.execute(select(SourceSpan).limit(2000))
     return list(result.scalars().all())
 
 
 async def retrieve_evidence(
-    session: AsyncSession, node: CurriculumNode, *, k: int = 5
+    session: AsyncSession, node: CurriculumNode, *, k: int = 5, embedding_router=None
 ) -> list[SourceSpan]:
     """Evidence shortlist for `node`, ranked by lexical overlap with its
     label/description/syllabus_ref.
     """
     query = " ".join(filter(None, [node.label, node.description, node.syllabus_ref]))
     candidates = await _candidate_spans(session, node)
-    return [scored.span for scored in rank_spans(query, candidates, k)]
+    lexical = rank_spans(query, candidates, max(k, 20))
+    shortlist = [r.span for r in lexical]
+    if not shortlist:
+        shortlist = candidates[:20]
+    if not shortlist:
+        return []
+    try:
+        if embedding_router is None:
+            from app.providers.embeddings import get_embedding_router
+
+            embedding_router = get_embedding_router()
+        # Bound the embedding cost and latency; outage uses the lexical ranking.
+        response = await asyncio.wait_for(
+            embedding_router.call(lambda p: p.embed([query] + [s.text[:6000] for s in shortlist])),
+            timeout=4,
+        )
+        if len(response.vectors) != len(shortlist) + 1:
+            raise ValueError("Embedding provider returned an incomplete batch")
+        query_vector = response.vectors[0]
+        hybrid = [
+            ScoredSpan(
+                s, 0.4 * lexical_overlap(query, s.text) + 0.6 * cosine_similarity(query_vector, v)
+            )
+            for s, v in zip(shortlist, response.vectors[1:])
+        ]
+        return [r.span for r in sorted(hybrid, key=lambda r: -r.score)[:k] if r.score > 0]
+    except Exception as exc:
+        logger.warning(
+            "generation retrieval: semantic reranking unavailable (%s); lexical fallback",
+            type(exc).__name__,
+        )
+        return [r.span for r in lexical[:k]]

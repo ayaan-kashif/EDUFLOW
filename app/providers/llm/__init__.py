@@ -1,5 +1,6 @@
 import logging
 from collections.abc import Callable
+from functools import lru_cache
 
 from app.config import Settings, get_provider_config, get_settings
 from app.providers.router import FallbackChain, ProviderRouter
@@ -55,7 +56,21 @@ def _ollama_verify_provider():
     return OllamaVerifyLLMProvider
 
 
+def _huggingface_provider():
+    from app.providers.llm.huggingface_provider import HuggingFaceLLMProvider
+
+    return HuggingFaceLLMProvider
+
+
+def _huggingface_verify_provider():
+    from app.providers.llm.huggingface_provider import HuggingFaceVerifyLLMProvider
+
+    return HuggingFaceVerifyLLMProvider
+
+
 _LLM_PROVIDERS: dict[str, Callable[[], type]] = {
+    "huggingface": _huggingface_provider,
+    "huggingface_verify": _huggingface_verify_provider,
     "anthropic": _anthropic_provider,
     "openai": _openai_provider,
     "groq": _groq_provider,
@@ -100,11 +115,13 @@ def _build_chain(capability: str, settings: Settings) -> FallbackChain:
     return FallbackChain(routers)
 
 
+@lru_cache(maxsize=1)
 def get_generation_chain() -> FallbackChain:
     """LLM calls that draft content. Lower trust stakes than verification."""
     return _build_chain("generation", get_settings())
 
 
+@lru_cache(maxsize=1)
 def get_verification_chain() -> FallbackChain:
     """LLM calls that check a generated claim against its cited evidence.
 

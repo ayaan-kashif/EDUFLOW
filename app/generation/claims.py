@@ -31,6 +31,7 @@ class GeneratedClaim:
 
     text: str
     evidence_span_ids: list[str] = field(default_factory=list)
+    evidence_quotes: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -74,8 +75,12 @@ def parse_generated_claims(raw_text: str) -> list[GeneratedClaim]:
         evidence = item.get("evidence", [])
         if not isinstance(evidence, list):
             raise ClaimParseError(f"claim evidence must be a list: {item!r}")
+        if not isinstance(item.get('quotes',{}),dict):
+            raise ClaimParseError('Claim quotes must be an object mapping span IDs to quotations')
         claims.append(
-            GeneratedClaim(text=str(item["text"]), evidence_span_ids=[str(e) for e in evidence])
+            GeneratedClaim(text=str(item["text"]), evidence_span_ids=[str(e) for e in evidence],
+                           evidence_quotes={str(k): str(v) for k, v in item.get("quotes", {}).items()}
+                           if isinstance(item.get("quotes", {}), dict) else {})
         )
     return claims
 

@@ -1,6 +1,6 @@
-# CurriculumOS — Build Handoff Package
+# EduFlow — Build Handoff Package
 
-This folder is a complete build brief for **CurriculumOS**: a curriculum planning engine that grounds every scheduled lesson in a verifiable source, and automatically repairs the term plan when the calendar changes.
+This folder is a complete build brief for **EduFlow**: a curriculum planning engine that grounds every scheduled lesson in a verifiable source, and automatically repairs the term plan when the calendar changes.
 
 It's written to be handed to an agentic coding tool (or a human engineering team) as a self-contained spec.
 
@@ -30,4 +30,4 @@ For the original product/build brief, read the files in this order:
 
 ## One-line project description (for commit messages / repo README)
 
-> CurriculumOS ingests textbooks, past papers, mark schemes, and academic calendars to build a grounded, citable term plan — and automatically replans it when the calendar changes, while minimizing disruption to what's already been taught.
+> EduFlow ingests textbooks, past papers, mark schemes, and academic calendars to build a grounded, citable term plan — and automatically replans it when the calendar changes, while minimizing disruption to what's already been taught.

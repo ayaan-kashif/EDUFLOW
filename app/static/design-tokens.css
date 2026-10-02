@@ -1,0 +1,46 @@
+/* EduFlow / Atelier. Shared foundations for both workspace surfaces. */
+:root {
+  --paper: #f3f0e7;
+  --surface: #fcfaf4;
+  --sunken: #eae6dc;
+  --ink: #262a29;
+  --soft: #676b65;
+  --line: #d5d3c8;
+  --accent: #354f93;
+  --accent-bg: #e5e9f2;
+  --on-accent: #fffdf7;
+  --orange: #ba492e;
+  --orange-bg: #f3e2d6;
+  --ok: #326651;
+  --warn: #815b21;
+  --bad: #a1382d;
+  --font: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif;
+  --display: var(--font);
+  --mono: 'IBM Plex Mono', Consolas, monospace;
+  --serif: Georgia, 'Times New Roman', serif;
+  --radius: 5px;
+  --shadow: 0 2px 0 #262a2910, 0 12px 28px #262a2906;
+  --ease: cubic-bezier(.22,1,.36,1);
+  color-scheme: light;
+}
+:root[data-theme='dark'] {
+  --paper: #1c2223;
+  --surface: #242c2e;
+  --sunken: #303a3c;
+  --ink: #f1eee3;
+  --soft: #bcc2ba;
+  --line: #465252;
+  --accent: #b5c9ff;
+  --accent-bg: #33445c;
+  --on-accent: #172637;
+  --orange: #ffb398;
+  --orange-bg: #53362d;
+  --ok: #a4d4b7;
+  --warn: #efc786;
+  --bad: #ffb1a4;
+  --shadow: 0 2px 0 #0002, 0 12px 28px #0001;
+  color-scheme: dark;
+}
+@media(prefers-reduced-motion:reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}

@@ -14,6 +14,7 @@ and fall back to anydoc only if there's no text layer to read.
 # once that download is acceptable.
 """
 
+import asyncio
 import re
 
 from pypdf import PdfReader
@@ -75,6 +76,9 @@ class PyPdfParserProvider(ParserProvider):
     name = "pypdf_text"
 
     async def parse(self, file_path: str) -> ParsedDocument:
+        return await asyncio.to_thread(self._parse_sync, file_path)
+
+    def _parse_sync(self, file_path: str) -> ParsedDocument:
         try:
             reader = PdfReader(file_path)
         except Exception as exc:  # pypdf raises library-specific errors

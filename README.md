@@ -1,6 +1,6 @@
-# CurriculumOS
+# EduFlow
 
-> CurriculumOS ingests textbooks, past papers, mark schemes, and academic calendars to build a grounded, citable term plan — and automatically replans it when the calendar changes, while minimizing disruption to what's already been taught.
+> EduFlow ingests textbooks, past papers, mark schemes, and academic calendars to build a grounded, citable term plan — and automatically replans it when the calendar changes, while minimizing disruption to what's already been taught.
 
 ## What it actually does
 
@@ -11,7 +11,7 @@ The pipeline, end to end:
 ```
 upload sources          PDF / DOCX / scanned book
       ↓                 anydoc (no ML model) → vision-LLM OCR for scanned pages
-provenance store        every paragraph → document + page + bbox + content hash
+provenance store        source blocks → document + parser-reported page/bbox + content hash
       ↓
 curriculum extraction   LLM proposes topics / objectives / prerequisites
       ↓                 tagged machine_extracted, confidence < 1.0, always
@@ -23,7 +23,7 @@ teacher correction      logged verbatim; overwrites the live mapping; always win
       ↓
 emphasis scoring        frequency × recency decay × marks × syllabus × structure
       ↓
-CP-SAT scheduling       teaching units → calendar capacity, hard constraints first
+CP-SAT scheduling       bounded durations + split sessions + emphasis + taught-session locks
       ↓
 disruption & replan     churn minimisation is an objective, not a report
       ↓
@@ -31,11 +31,13 @@ grounded generation     retrieve → generate claims → verify with a DIFFERENT
                         → reject unsupported → render
 ```
 
-A teacher workspace at `/` walks all ten stages in order.
+The workspace at `/` has Sources, Plan, and Evidence views. The original ten-stage
+workflow remains at `/pipeline.html`. See [the upgrade and demo guide](docs/HACKATHON_UPGRADES.md)
+for the implemented features, evaluation results, and remaining production work.
 
 ## Ground rules
 
-1. Every generated instructional claim carries provenance — a mechanically checkable span reference, not "page 47".
+1. Generated claims undergo citation-resolution, content-hash, and supplied-quote checks before independent semantic verification. Mechanical integrity alone does not establish factual support.
 2. No student-level data. Class-level, teacher-entered mastery signals only.
 3. Every external API (LLM, embeddings, parsing) goes through the provider abstraction in `app/providers/` — never call an SDK directly elsewhere.
 4. Verification must use a different provider/model than generation. A model does not grade its own homework; this is enforced at call time, not just in config.
@@ -46,18 +48,33 @@ A teacher workspace at `/` walks all ten stages in order.
 Requires Python 3.11+. No Docker, no Postgres — uses SQLite.
 
 ```bash
-pip install -e ".[dev]" aiosqlite  # lightweight: app + tests + linting
+pip install -r requirements.lock
+pip install -e . --no-deps
 DATABASE_URL=sqlite+aiosqlite:///./curriculumos.db python scripts/setup_sqlite.py
 uvicorn app.main:app --reload
 ```
 
-Then run the self-contained demo (generates PDFs in memory, no external files needed):
+The original pipeline exercise is also available when its AI providers are configured:
 
 ```bash
 python scripts/demo_seed.py   # exercises all 10 pipeline stages
 ```
 
-Or open <http://localhost:8000> and walk the workspace manually.
+For the provider-free presentation, open <http://localhost:8000> and select **Try the Biology demo**. This seeds
+original synthetic sources, mappings, a timetable, and inspectable claims without
+provider keys. The demo claims remain explicitly unchecked; they are not fabricated
+verification successes. **Load public syllabus** downloads the official Cambridge
+Biology syllabus when the network is available, then stores its extracted sources.
+
+On Windows PowerShell, after creating and installing into a virtual environment:
+
+```powershell
+$env:DATABASE_URL = 'sqlite+aiosqlite:///./curriculumos.db'
+.venv/Scripts/python.exe scripts/setup_sqlite.py
+.venv/Scripts/python.exe -m uvicorn app.main:app --reload
+```
+
+The setup script creates missing tables and does not overwrite `.env`.
 
 ### With Docker (PostgreSQL)
 
@@ -74,7 +91,7 @@ OCR, worker, and cloud-provider dependency before the app can boot:
 ```bash
 pip install -e ".[parsing]"   # docling + anydoc for richer document parsing
 pip install -e ".[cloud]"     # Anthropic provider support
-pip install -e ".[workers]"   # Celery + Redis worker dependencies
+pip install -e ".[workers]"   # optional dependencies for a future durable worker deployment
 pip install -e ".[full]"      # everything above plus dev tools
 ```
 
@@ -89,22 +106,34 @@ Everything external is a swappable provider behind `app/providers/`, routed by
 
 | Capability | Chain | Notes |
 |---|---|---|
-| Parsing | `anydoc` → `vision_llm_ocr` | anydoc is pure Rust, no ML weights, <5ms/doc; OCR only reached when a PDF genuinely has no text layer. `docling` is available but kept out of the default chain because its layout model downloads on first use. |
-| LLM generation | `ollama` → cloud providers | Any of Anthropic / OpenAI / Groq / OpenRouter / Together / Fireworks; unconfigured providers are skipped, not failed. |
-| LLM verification | `ollama_verify` → cloud | First entry must differ from generation's — checked at call time. |
+| Parsing | `pypdf_text` → `anydoc` → `vision_llm_ocr` | Text PDFs retain page numbers; pypdf boxes cover the page. AnyDoc does not establish page-level provenance. Optional Docling can supply block coordinates. |
+| LLM generation | `huggingface` → other cloud providers → `ollama` | Configure `HF_TOKEN` for hosted inference. Unconfigured providers are skipped. |
+| LLM verification | `huggingface_verify` → other cloud providers → `ollama_verify` | A distinct model is required; generation cannot verify itself. |
 | Embeddings | `qwen3-embedding:0.6b` via Ollama | 1024-dim, stored in pgvector on `curriculum_nodes.embedding`. |
 
 Only `DATABASE_URL` is strictly required. Every provider key is optional — the chains skip what isn't configured, so the app runs with a local Ollama and no cloud keys at all.
 
+For Hugging Face, set `HF_TOKEN` in the ignored `.env` file. `HF_MODEL` defaults to
+`Qwen/Qwen3-4B-Instruct-2507:nscale`; `HF_VERIFY_MODEL` uses a different Llama model.
+The token needs Inference Providers permission and available inference credits.
+Restart the server after changing these settings. Model routing can change; both
+model IDs are configurable. Successful objective extraction persists the nodes;
+planning and replanning do not call this API again.
+
 ## Testing
 
 ```bash
-python -m pytest -q            # 164 tests, <6 seconds
-python -m ruff check app/ tests/   # lint
+python -m pytest -q
+python -m ruff check app tests eval
 python -m mypy app/api/planning.py app/planning/service.py --ignore-missing-imports  # type check
+node --check app/static/studio.js
+python -m eval.run             # writes the labeled offline regression report
 ```
 
-Tests cover: pure logic (scheduler, signals, claim parsing, question-ref, emphasis, curriculum extraction), service orchestration (FakeSession with real SQLAlchemy queries), and API endpoints (Starlette TestClient). No database or provider keys required to run the full suite.
+Tests cover pure logic, service orchestration, real temporary SQLite integration,
+streamed ingestion, exports, taught-session preservation, and API endpoints. No
+running database server or provider keys are required. The synthetic evaluation
+does not establish real-world teaching quality or semantic hallucination rates.
 
 ## Repo layout
 
@@ -119,14 +148,27 @@ app/
   generation/   # verify-then-render lesson & assessment generation
   api/          # FastAPI routes
   static/       # teacher workspace UI
-  workers/      # Celery tasks
+  workers/      # bounded process-local ingestion jobs and SSE progress
 migrations/     # Alembic
 config/         # provider routing config (no secrets)
-eval/           # retrieval/extraction benchmarks
+eval/           # labeled synthetic mapping, evidence integrity, and replan regression
 ```
 
-Design docs live in [`CurriculumOS_Handoff/`](CurriculumOS_Handoff/) — start with [`00_README.md`](CurriculumOS_Handoff/00_README.md).
+Design docs live in [`EduFlow_Handoff/`](EduFlow_Handoff/) — start with [`00_README.md`](EduFlow_Handoff/00_README.md).
 
 ## Deliberate shortcuts
 
-Marked in code with `# ponytail:` comments naming the ceiling and the upgrade path — page-level (not paragraph-level) provenance on OCR'd documents, single-session scheduling for splittable units, hard constraints plus churn minimisation without the full soft-constraint set. `grep -rn "ponytail:" app/` lists them.
+The [competitive execution blueprint](docs/COMPETITIVE_BLUEPRINT.md) records the
+first-party benchmark, implemented control-room workflow, and three-minute pitch.
+The workspace now includes a source-to-plan wizard, coverage/evidence ledger,
+saved-plan switching, and Recovery Lab comparisons with exact reviewed application.
+PostgreSQL installations need migration `0004` (`alembic upgrade head`); rerun the
+SQLite setup script for local installations. Existing records are preserved.
+
+This remains a single-tenant prototype. Job metadata, provider breakers, and rate
+limits are process-local; a multi-process deployment needs shared state and durable
+workers. Source attribution precision depends on the parser. Generation retrieval
+uses a bounded hybrid rerank with lexical fallback, rather than an indexed span
+vector database. Scheduling supports split sessions and bounded shortening; it
+does not infer pedagogically safe minimum durations. Use teacher-approved bounds.
+Run `rg "ponytail:" app` to find additional local limitations.

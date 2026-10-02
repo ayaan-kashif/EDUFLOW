@@ -1,4 +1,4 @@
-# CurriculumOS — pinned dependencies
+# EduFlow — pinned dependencies
 # Generated from a working Python 3.14 environment.
 # For the lightweight dev install, use: pip install -e ".[dev]"
 

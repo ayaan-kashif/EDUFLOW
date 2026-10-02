@@ -1,4 +1,7 @@
+from typing import cast
+
 from openai import APIError, APIStatusError, AsyncOpenAI
+from openai.types.chat import ChatCompletionMessageParam
 
 from app.config import Settings
 from app.providers.base import LLMMessage, LLMProvider, LLMResponse, ProviderError
@@ -28,7 +31,7 @@ class OpenAILLMProvider(LLMProvider):
         try:
             response = await self._client.chat.completions.create(
                 model=self._model,
-                messages=[{"role": m.role, "content": m.content} for m in messages],
+                messages=[cast(ChatCompletionMessageParam, {"role": m.role, "content": m.content}) for m in messages],
                 max_tokens=max_tokens,
                 temperature=temperature,
             )
@@ -40,6 +43,6 @@ class OpenAILLMProvider(LLMProvider):
             text=choice.message.content or "",
             model=response.model,
             provider=self.name,
-            input_tokens=response.usage.prompt_tokens,
-            output_tokens=response.usage.completion_tokens,
+            input_tokens=response.usage.prompt_tokens if response.usage else 0,
+            output_tokens=response.usage.completion_tokens if response.usage else 0,
         )

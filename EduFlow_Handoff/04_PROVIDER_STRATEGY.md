@@ -57,7 +57,7 @@ Generation and verification are the most expensive line items in this system's u
 | Do not use for general documents | ~~Nomic Embed Text v2~~ | Confirmed 512-token hard truncation limit — unsuitable for textbook-chapter-length chunks. Only viable for single-question/short-span embeddings if ever used at all. |
 
 ### Build requirement
-Before locking in a provider, build a small CurriculumOS-specific retrieval benchmark (~200 query → expected-source-span pairs drawn from real ingested textbooks/past papers) and evaluate Recall@5/10, MRR, and citation-source recall. Do not select purely from public MTEB leaderboard rank.
+Before locking in a provider, build a small EduFlow-specific retrieval benchmark (~200 query → expected-source-span pairs drawn from real ingested textbooks/past papers) and evaluate Recall@5/10, MRR, and citation-source recall. Do not select purely from public MTEB leaderboard rank.
 
 ---
 

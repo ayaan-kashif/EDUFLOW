@@ -12,7 +12,7 @@ from pathlib import Path, PurePosixPath, PureWindowsPath
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -161,9 +161,11 @@ async def embed_curriculum_nodes(session: AsyncSession = Depends(get_session)) -
 
 class GenerateTeachingUnitsRequest(BaseModel):
     node_ids: list[UUID]
-    default_duration_minutes: int = 60
+    default_duration_minutes: int = Field(default=60,ge=15,le=600)
     priorities: dict[UUID, float] = {}  # optional, e.g. from /emphasis/ scores
-    default_priority: float = 0.5
+    default_priority: float = Field(default=0.5,ge=0,le=1)
+    splittable: bool = False
+    minimum_session_minutes: int = Field(default=15,ge=5,le=120)
 
 
 class TeachingUnitOut(BaseModel):
@@ -187,6 +189,8 @@ async def generate_teaching_units(
         .all()
     )
     existing_ids = set(existing)
+    if any(not 0 <= priority <= 1 for priority in body.priorities.values()):
+        raise HTTPException(422,'Priorities must be between zero and one')
 
     created: list[TeachingUnit] = []
     for node_id in body.node_ids:
@@ -195,11 +199,13 @@ async def generate_teaching_units(
         unit = TeachingUnit(
             node_id=node_id,
             duration_minutes=body.default_duration_minutes,
-            splittable=False,
+            splittable=body.splittable,
+            minimum_session_minutes=body.minimum_session_minutes,
             priority=body.priorities.get(node_id, body.default_priority),
         )
         session.add(unit)
         created.append(unit)
+        existing_ids.add(node_id)
 
     await session.commit()
     for unit in created:

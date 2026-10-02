@@ -2,7 +2,7 @@
 
 ## What this is
 
-CurriculumOS is a curriculum planning engine, not a lesson-generation tool. The distinction matters: lesson generation is a solved, commoditized problem in 2026. What's still open is a system that can (a) **prove** why every scheduled lesson exists, tracing back to a specific source and curriculum objective, and (b) **automatically repair** the plan when reality disrupts the calendar — without needless churn.
+EduFlow is a curriculum planning engine, not a lesson-generation tool. The distinction matters: lesson generation is a solved, commoditized problem in 2026. What's still open is a system that can (a) **prove** why every scheduled lesson exists, tracing back to a specific source and curriculum objective, and (b) **automatically repair** the plan when reality disrupts the calendar — without needless churn.
 
 ## The thesis
 
@@ -20,7 +20,7 @@ Lesson-plan generation itself is crowded: MagicSchool, Kuraplan, TeachQuill, Edu
 
 We have not identified a mainstream product that combines historical exam-emphasis mapping with constraint-based automatic replanning of a live academic calendar. That is a hypothesis to keep re-testing as the market moves, not a permanent fact.
 
-## What CurriculumOS explicitly is *not*, in v1
+## What EduFlow explicitly is *not*, in v1
 
 - Not a full LMS or gradebook.
 - Not a student-facing tutoring product.

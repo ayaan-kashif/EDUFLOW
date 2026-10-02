@@ -46,9 +46,8 @@ from sqlalchemy import (
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.domain.types import PortableArray, PortableJSON, PortableUUID, PortableVector
-
 from app.domain.base import Base, CreatedAtMixin, UUIDPk
+from app.domain.types import PortableArray, PortableJSON, PortableUUID, PortableVector
 
 
 class NodeType(str, Enum):
@@ -205,6 +204,26 @@ class SourceSpan(UUIDPk, Base):
     content_hash: Mapped[str] = mapped_column(String, nullable=False)
 
     __table_args__ = (Index("ix_source_spans_document_block", "document_id", "block_id"),)
+
+
+class SourceCurriculum(Base):
+    """Latest extraction per source; reused only while the source fingerprint matches."""
+    __tablename__ = "source_curricula"
+    document_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("source_documents.id", ondelete="CASCADE"), primary_key=True)
+    fingerprint: Mapped[str] = mapped_column(String, nullable=False)
+    node_ids: Mapped[list] = mapped_column(PortableJSON(), nullable=False)
+    metadata_json: Mapped[dict] = mapped_column(PortableJSON(), nullable=False)
+
+
+class RecoveryScenario(UUIDPk, CreatedAtMixin, Base):
+    """Reviewed solver output, anchored to a fingerprint of the original timetable."""
+    __tablename__ = "recovery_scenarios"
+    plan_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("plan_versions.id"), index=True)
+    fingerprint: Mapped[str] = mapped_column(String, nullable=False)
+    payload: Mapped[dict] = mapped_column(PortableJSON(), nullable=False)
+    applied_plan_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("plan_versions.id"))
+    applied_option: Mapped[str | None] = mapped_column(String)
 
 
 class ExamQuestion(UUIDPk, Base):

@@ -14,10 +14,18 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
-from app.domain.models import MappingMethod, QuestionNodeMapping, TeacherCorrection
+from app.domain.models import (
+    CurriculumNode,
+    ExamQuestion,
+    MappingMethod,
+    MarkSchemeEntry,
+    QuestionNodeMapping,
+    TeacherCorrection,
+)
 
 router = APIRouter(prefix="/corrections", tags=["corrections"])
 
@@ -74,3 +82,65 @@ async def create_correction(
     await session.commit()
     await session.refresh(correction)
     return CorrectionOut(id=correction.id)
+
+
+@router.post("/calibrate")
+async def calibrate(session: AsyncSession = Depends(get_session)):
+    from uuid import uuid4
+
+    from app.mapping.calibration import fit_weights
+    from app.mapping.signals import lexical_overlap, terminology_match
+
+    rows = (
+        await session.execute(
+            select(QuestionNodeMapping, ExamQuestion, CurriculumNode)
+            .join(ExamQuestion, ExamQuestion.id == QuestionNodeMapping.question_id)
+            .join(CurriculumNode, CurriculumNode.id == QuestionNodeMapping.node_id)
+            .where(
+                QuestionNodeMapping.mapping_method == MappingMethod.HUMAN_CORRECTED,
+                QuestionNodeMapping.corrected_by.is_not(None),
+            )
+            .limit(2000)
+        )
+    ).all()
+    terms_by_question: dict[UUID, list[str]] = {}
+    for entry in (
+        (
+            await session.execute(
+                select(MarkSchemeEntry).where(
+                    MarkSchemeEntry.question_id.in_([q.id for _, q, _ in rows])
+                )
+            )
+        )
+        .scalars()
+        .all()
+    ):
+        terms_by_question.setdefault(entry.question_id, []).extend(entry.acceptable_terms or [])
+    examples = []
+    for mapping, question, node in rows:
+        text = f"{node.label} {node.description or ''}"
+        examples.append(
+            {
+                "question_id": str(question.id),
+                "target": mapping.weight,
+                "signals": {
+                    "lexical": lexical_overlap(question.text, text),
+                    "terminology": terminology_match(terms_by_question.get(question.id, []), text),
+                },
+            }
+        )
+    try:
+        report = fit_weights(examples)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    if report["accepted"]:
+        record = TeacherCorrection(
+            entity_type="ensemble_calibration",
+            entity_id=uuid4(),
+            before_value={},
+            after_value=report,
+            teacher_id="calibration_service",
+        )
+        session.add(record)
+        await session.commit()
+    return report

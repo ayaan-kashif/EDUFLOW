@@ -83,7 +83,10 @@ class VisionLLMParserProvider(ParserProvider):
             raise ProviderError(f"{self.name}: {payload['error']}")
         if "choices" not in payload:
             raise ProviderError(f"{self.name}: unexpected response shape: {payload}")
-        return payload["choices"][0]["message"]["content"].strip()
+        content = payload["choices"][0]["message"]["content"]
+        if not isinstance(content, str):
+            raise ProviderError(f"{self.name}: transcription content is not text")
+        return content.strip()
 
     async def _post_transcribe(self, b64: str) -> httpx.Response:
         try:

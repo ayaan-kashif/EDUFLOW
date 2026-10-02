@@ -1,7 +1,7 @@
 """Fully self-contained demo seeding script.
 
 Generates all input documents (syllabus, past paper, mark scheme) in memory
-as minimal valid PDFs, then drives the entire CurriculumOS pipeline over HTTP:
+as minimal valid PDFs, then drives the entire EduFlow pipeline over HTTP:
 upload → extract → embed → parse questions → map → corrections → mastery →
 emphasis → teaching units → calendar → plan → disrupt → replan → generation.
 

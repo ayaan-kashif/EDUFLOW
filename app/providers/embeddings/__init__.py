@@ -1,3 +1,5 @@
+from functools import lru_cache
+
 from app.config import get_provider_config, get_settings
 from app.providers.embeddings.qwen_provider import QwenEmbeddingProvider
 from app.providers.router import ProviderRouter
@@ -7,6 +9,7 @@ _EMBEDDING_PROVIDERS = {
 }
 
 
+@lru_cache(maxsize=1)
 def get_embedding_router() -> ProviderRouter:
     config = get_provider_config()["embeddings"]
     settings = get_settings()

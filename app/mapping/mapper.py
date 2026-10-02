@@ -106,10 +106,11 @@ class EnsembleMapper:
     "don't block the pipeline entirely on LLM availability."
     """
 
-    def __init__(self, session: AsyncSession, *, embedding_router=None, llm_chain=None):
+    def __init__(self, session: AsyncSession, *, embedding_router=None, llm_chain=None, signal_weights=None):
         self._session = session
         self._embedding_router = embedding_router
         self._llm_chain = llm_chain
+        self._signal_weights = signal_weights
 
     async def score_candidates(
         self,
@@ -134,7 +135,7 @@ class EnsembleMapper:
                 terminology=terminology_match(acceptable_terms or [], _node_text(node)),
                 llm=None if llm_scores is None else llm_scores.get(node.id, 0.0),
             )
-            weight, confidence = combine(scores)
+            weight, confidence = combine(scores,self._signal_weights)
             results.append(
                 MappingCandidate(node=node, scores=scores, weight=weight, confidence=confidence)
             )

@@ -7,17 +7,19 @@ import datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
 from app.domain.models import (
+    AcademicCalendar,
     CalendarDay,
     CurriculumNode,
     InstructionWindow,
     PlanVersion,
     ScheduledUnit,
+    ScheduledUnitStatus,
     TeachingUnit,
 )
 from app.planning.service import PlanningService, ScheduledUnitSnapshot, diff_schedules
@@ -27,17 +29,20 @@ router = APIRouter(prefix="/planning", tags=["planning"])
 
 class BuildPlanRequest(BaseModel):
     calendar_id: UUID
-    subject: str
-    class_id: str
-    node_ids: list[UUID]
-    trigger_reason: str = "initial_plan"
+    subject: str = Field(min_length=1, max_length=120)
+    class_id: str = Field(min_length=1, max_length=120)
+    node_ids: list[UUID] = Field(min_length=1, max_length=100)
+    trigger_reason: str = Field(default="initial_plan", max_length=1000)
     parent_version_id: UUID | None = None
+    coverage_preference: float = Field(default=0.5, ge=0, le=1)
+    minimum_duration_ratio: float = Field(default=1.0, ge=0.5, le=1)
 
 
 class AssignmentOut(BaseModel):
     unit_id: UUID
     window_id: UUID
     date: datetime.date
+    scheduled_minutes: int | None = None
 
 
 class PlanOut(BaseModel):
@@ -47,12 +52,24 @@ class PlanOut(BaseModel):
     unscheduled_unit_ids: list[UUID]
     unchanged_count: int
     moved_count: int
+    shortened_count: int = 0
+    solve_time_ms: float = 0
+    weighted_coverage: float = 0
+    explanations: dict[str, str] = {}
+    conflict_unit_ids: list[UUID] = []
 
 
 @router.post("/plans", response_model=PlanOut)
 async def build_plan(
     body: BuildPlanRequest, session: AsyncSession = Depends(get_session)
 ) -> PlanOut:
+    calendar = await session.get(AcademicCalendar, body.calendar_id)
+    if calendar is None:
+        raise HTTPException(404, 'Calendar not found')
+    if body.parent_version_id:
+        parent = await session.get(PlanVersion,body.parent_version_id)
+        if parent is None or parent.calendar_id != body.calendar_id:
+            raise HTTPException(422,'Parent plan must belong to the selected calendar')
     plan_version, result = await PlanningService(session).build_plan(
         calendar_id=body.calendar_id,
         subject=body.subject,
@@ -60,22 +77,41 @@ async def build_plan(
         node_ids=body.node_ids,
         trigger_reason=body.trigger_reason,
         parent_version_id=body.parent_version_id,
+        coverage_preference=body.coverage_preference,
+        minimum_duration_ratio=body.minimum_duration_ratio,
     )
     return PlanOut(
         plan_version_id=plan_version.id,
         status=result.status,
         assignments=[
-            AssignmentOut(unit_id=a.unit_id, window_id=a.window_id, date=a.date)
+            AssignmentOut(unit_id=a.unit_id, window_id=a.window_id, date=a.date,
+                          scheduled_minutes=a.scheduled_minutes)
             for a in result.assignments
         ],
         unscheduled_unit_ids=result.unscheduled_unit_ids,
         unchanged_count=result.unchanged_count,
         moved_count=result.moved_count,
+        shortened_count=result.shortened_count,
+        solve_time_ms=result.solve_time_ms,
+        weighted_coverage=result.weighted_coverage,
+        explanations=result.explanations,
+        conflict_unit_ids=result.conflict_unit_ids,
     )
+
+
+@router.post('/plans/{plan_id}/sessions/{session_id}/taught')
+async def mark_taught(plan_id: UUID,session_id: UUID,session: AsyncSession=Depends(get_session)):
+    row = await session.get(ScheduledUnit,session_id)
+    if row is None or row.plan_version != plan_id:
+        raise HTTPException(404,'Scheduled session not found in this plan')
+    row.status = ScheduledUnitStatus.TAUGHT
+    await session.commit()
+    return {'id':row.id,'status':'taught'}
 
 
 class PlanVersionOut(BaseModel):
     id: UUID
+    created_at: datetime.datetime
     calendar_id: UUID
     parent_version_id: UUID | None
     trigger_reason: str
@@ -101,7 +137,7 @@ async def list_plans(session: AsyncSession = Depends(get_session)) -> list[PlanV
     )
     return [
         PlanVersionOut(
-            id=v.id, calendar_id=v.calendar_id, parent_version_id=v.parent_version_id,
+            id=v.id, created_at=v.created_at, calendar_id=v.calendar_id, parent_version_id=v.parent_version_id,
             trigger_reason=v.trigger_reason, scheduled_count=counts.get(v.id, 0),
         )
         for v in versions
@@ -114,6 +150,10 @@ class ScheduledUnitOut(BaseModel):
     date: datetime.date
     scheduled_minutes: int
     status: str
+    teaching_unit_id: UUID | None = None
+    node_id: UUID | None = None
+    priority: float = 0
+    start_time: datetime.time | None = None
 
 
 async def _scheduled_snapshots(
@@ -137,6 +177,7 @@ async def _scheduled_snapshots(
             date=day.date,
             scheduled_minutes=su.scheduled_minutes,
             status=su.status.value,
+            window_id=su.instruction_window_id,
         )
         for su, _, node, _, day in rows
     ]
@@ -162,10 +203,13 @@ async def get_plan(
             .order_by(CalendarDay.date)
         )
     ).all()
-    if not rows:
-        raise HTTPException(status_code=404, detail="no scheduled units for that plan_version_id")
+    if not rows and await session.get(PlanVersion,plan_version_id) is None:
+        raise HTTPException(status_code=404, detail="plan_version not found")
     return [
-        ScheduledUnitOut(id=su.id, node_label=node.label, date=day.date, scheduled_minutes=su.scheduled_minutes, status=su.status.value)
+        ScheduledUnitOut(id=su.id, node_label=node.label, date=day.date,
+                         scheduled_minutes=su.scheduled_minutes, status=su.status.value,
+                         teaching_unit_id=tu.id, node_id=node.id, priority=tu.priority,
+                         start_time=win.start_time)
         for su, tu, node, win, day in rows
     ]
 
@@ -259,6 +303,7 @@ class JustificationOut(BaseModel):
 async def get_unit_justification(
     plan_version_id: UUID,
     unit_id: UUID,
+    scheduled_session_id: UUID | None = None,
     session: AsyncSession = Depends(get_session),
 ) -> JustificationOut:
     """Why is this lesson scheduled here? Full provenance: prerequisite
@@ -288,6 +333,7 @@ async def get_unit_justification(
             .where(
                 ScheduledUnit.plan_version == plan_version_id,
                 ScheduledUnit.unit_id == unit_id,
+                ScheduledUnit.id == scheduled_session_id if scheduled_session_id else ScheduledUnit.id.is_not(None),
             )
         )
     ).first()
@@ -330,31 +376,17 @@ async def get_unit_justification(
         if prereq_node.id not in existing_prereq_ids:
             prereqs.append(PrerequisiteOut(node_id=prereq_node.id, node_label=prereq_node.label))
 
-    # 4. Emphasis score for this objective
+    # 4. Use the same normalized scoring service as the solver.
     emphasis_score: float | None = None
     emph_freq = emph_rec = emph_marks = emph_syll = emph_struct = None
-    emph_rows = (
-        await session.execute(
-            select(
-                QuestionNodeMapping.weight,
-                ExamQuestion.marks,
-                ExamQuestion.year,
-            )
-            .join(ExamQuestion, ExamQuestion.id == QuestionNodeMapping.question_id)
-            .where(QuestionNodeMapping.node_id == node.id)
-        )
-    ).all()
-    if emph_rows:
-        total_weight = sum(r[0] for r in emph_rows)
-        total_marks = sum(r[1] or 0 for r in emph_rows)
-        emph_freq = min(total_weight / max(len(emph_rows), 1), 1.0)
-        emph_marks = min(total_marks / 100.0, 1.0) if total_marks else 0.0
-        emph_syll = 1.0 if node.syllabus_ref else 0.0
-        emph_struct = max(0.0, min(1.0, node.confidence))
-        emphasis_score = round(
-            0.2 * emph_freq + 0.2 * emph_freq + 0.2 * emph_marks + 0.2 * emph_syll + 0.2 * emph_struct,
-            3,
-        )
+    from app.emphasis.service import HistoricalAssessmentEmphasisService
+    emphasis = next((r for r in await HistoricalAssessmentEmphasisService(session).calculate()
+                     if r.node_id == node.id), None)
+    if emphasis:
+        emphasis_score = emphasis.score
+        emph_freq, emph_rec = emphasis.components.frequency, emphasis.components.recency
+        emph_marks = emphasis.components.marks
+        emph_syll, emph_struct = emphasis.components.syllabus, emphasis.components.structural
 
     # 5. Source pages: find spans that cite this objective's content
     source_pages: list[SourcePageOut] = []

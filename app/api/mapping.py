@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
-from app.domain.models import CurriculumNode, ExamQuestion, MarkSchemeEntry
+from app.domain.models import CurriculumNode, ExamQuestion, MarkSchemeEntry, TeacherCorrection
 from app.mapping.mapper import EnsembleMapper
 from app.mapping.retrieval import top_k_similar_nodes
 from app.providers.base import ProviderError
@@ -107,9 +107,10 @@ async def map_question(
     ):
         acceptable_terms.extend(entry.acceptable_terms or [])
 
-    mapper = EnsembleMapper(
-        session, embedding_router=embedding_router, llm_chain=await _get_llm_chain()
-    )
+    calibration = (await session.execute(select(TeacherCorrection).where(
+        TeacherCorrection.entity_type == 'ensemble_calibration').order_by(TeacherCorrection.created_at.desc()).limit(1))).scalars().first()
+    mapper = EnsembleMapper(session, embedding_router=embedding_router,llm_chain=await _get_llm_chain(),
+                            signal_weights=calibration.after_value.get('weights') if calibration else None)
     mappings = await mapper.map_question(
         question, candidates, acceptable_terms=acceptable_terms, min_confidence=body.min_confidence
     )

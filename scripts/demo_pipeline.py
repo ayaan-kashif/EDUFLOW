@@ -1,4 +1,4 @@
-"""Drive the whole CurriculumOS pipeline over HTTP, end to end.
+"""Drive the whole EduFlow pipeline over HTTP, end to end.
 
 Same path the teacher workspace takes, in one run: upload -> extract
 curriculum -> embed -> parse questions -> map -> emphasis -> teaching units

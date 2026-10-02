@@ -7,6 +7,7 @@ themselves should be thin SDK wrappers with no resilience logic of their own.
 
 import logging
 import time
+from collections import deque
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Generic, TypeVar
@@ -21,6 +22,7 @@ from tenacity import (
 from app.providers.base import ProviderError, ProviderUnavailableError
 
 logger = logging.getLogger(__name__)
+PROVIDER_EVENTS: deque[dict] = deque(maxlen=100)
 
 T = TypeVar("T")  # provider type
 R = TypeVar("R")  # call() return type — independent of T, e.g. LLMResponse from an LLMProvider
@@ -106,6 +108,9 @@ class ProviderRouter(Generic[T]):
             result = await _attempt()
         except ProviderError:
             self._breaker.record_failure(provider_name)
+            PROVIDER_EVENTS.append({"provider": provider_name, "status": "failed",
+                                    "elapsed_ms": round((time.monotonic() - start) * 1000),
+                                    "circuit_open": self._breaker._state.opened_at is not None})
             raise
         else:
             self._breaker.record_success()
@@ -116,6 +121,10 @@ class ProviderRouter(Generic[T]):
             # when present rather than plumbing a task-specific return type
             # through this generic router.
             elapsed_ms = (time.monotonic() - start) * 1000
+            PROVIDER_EVENTS.append({"provider": provider_name, "status": "ok",
+                                    "elapsed_ms": round(elapsed_ms), "circuit_open": False,
+                                    "input_tokens": getattr(result, "input_tokens", None),
+                                    "output_tokens": getattr(result, "output_tokens", None)})
             logger.info(
                 "provider_call provider=%s elapsed_ms=%.0f input_tokens=%s output_tokens=%s",
                 provider_name,

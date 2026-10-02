@@ -19,13 +19,9 @@
 
 llm:
   generation:
-    # LIVE-DEMO OVERRIDE: ollama first, not last. 04_PROVIDER_STRATEGY.md's
-    # documented order is Anthropic -> OpenAI -> self-hosted; as of this
-    # run neither Anthropic/OpenAI keys are set nor do the configured
-    # Groq/OpenRouter keys actually work (invalid key / no credits — see
-    # session notes), so ollama is the only provider that's actually
-    # reachable. Revert this ordering once real cloud keys are in place.
-    priority: [ollama, anthropic, openai, groq, together, fireworks, openrouter]
+    # Hosted inference is preferred when HF_TOKEN is configured.
+    # Unconfigured providers are skipped; Ollama remains the local fallback.
+    priority: [huggingface, anthropic, openai, groq, together, fireworks, openrouter, ollama]
     retry:
       attempts: 3
       backoff_seconds: 2
@@ -40,7 +36,7 @@ llm:
     # in this package's __init__.py treats it as real independent
     # verification, not a model grading its own output. First entry must
     # differ from generation.priority[0].
-    priority: [ollama_verify, openai, anthropic, groq, openrouter]
+    priority: [huggingface_verify, openai, anthropic, groq, openrouter, ollama_verify]
     retry:
       attempts: 3
       backoff_seconds: 2

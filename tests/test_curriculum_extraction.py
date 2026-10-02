@@ -40,3 +40,39 @@ def test_missing_prerequisite_refs_defaults_to_empty():
 def test_malformed_responses_raise_rather_than_persist_a_partial_tree(raw):
     with pytest.raises(CurriculumExtractionError):
         _parse_extraction(raw)
+
+
+@pytest.mark.parametrize("failure", [ValueError("no configured model"), RuntimeError("unused")])
+async def test_provider_setup_and_outage_explain_how_to_recover(monkeypatch, failure):
+    from uuid import uuid4
+
+    from app.domain.models import SourceSpan
+    from app.ingestion.curriculum_extraction import CurriculumExtractionService
+    from app.providers.base import ProviderUnavailableError
+    from tests.conftest import FakeSession
+
+    doc_id = uuid4()
+    session = FakeSession({SourceSpan: [SourceSpan(document_id=doc_id, text="Describe cells.", page=1, block_id="1")]})
+    service = CurriculumExtractionService(session)
+
+    class OfflineChain:
+        async def call(self, fn):
+            raise ProviderUnavailableError("all providers exhausted")
+
+    async def chain():
+        if isinstance(failure, ValueError):
+            raise failure
+        return OfflineChain()
+
+    monkeypatch.setattr(service, "_get_chain", chain)
+    with pytest.raises(CurriculumExtractionError, match="OLLAMA_MODEL"):
+        await service.extract(doc_id)
+    assert not session.committed
+
+
+def test_blank_model_is_rejected_before_creating_a_provider():
+    from app.providers.llm.openai_compatible import OpenAICompatibleLLMProvider
+
+    with pytest.raises(ValueError, match="no model configured"):
+        OpenAICompatibleLLMProvider(name="local", model=" ", base_url="http://localhost:11434/v1",
+                                   api_key=None, requires_api_key=False)

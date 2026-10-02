@@ -15,7 +15,7 @@ One exam-driven subject with explicit topic relationships and clear textbook sou
 ```
 Upload sources
       ↓
-CurriculumOS extracts curriculum structure (objectives, subtopics, prerequisites)
+EduFlow extracts curriculum structure (objectives, subtopics, prerequisites)
       ↓
 Teacher reviews and corrects the extracted structure
       ↓

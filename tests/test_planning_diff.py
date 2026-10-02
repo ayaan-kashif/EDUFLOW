@@ -4,6 +4,13 @@ from datetime import date
 from app.planning.service import ScheduledUnitSnapshot, diff_schedules
 
 
+def test_same_day_timetable_move_is_visible():
+    uid = uuid.uuid4()
+    previous = ScheduledUnitSnapshot(uid, "Biology", date(2026, 10, 5), 60, "planned", uuid.uuid4())
+    current = ScheduledUnitSnapshot(uid, "Biology", date(2026, 10, 5), 60, "planned", uuid.uuid4())
+    assert diff_schedules([previous], [current])[0].change_type == "moved"
+
+
 def _snapshot(
     unit_id,
     label,

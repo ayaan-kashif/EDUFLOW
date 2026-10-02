@@ -4,7 +4,10 @@ Ollama, ...). Only base_url / api_key / default model differ between them
 — see the thin per-provider modules in this package.
 """
 
+from typing import cast
+
 from openai import APIError, APIStatusError, AsyncOpenAI
+from openai.types.chat import ChatCompletionMessageParam
 
 from app.providers.base import LLMMessage, LLMProvider, LLMResponse, ProviderError
 
@@ -21,11 +24,15 @@ class OpenAICompatibleLLMProvider(LLMProvider):
     ):
         if requires_api_key and not api_key:
             raise ValueError(f"{name}: no API key configured")
+        if not model or not model.strip():
+            raise ValueError(f"{name}: no model configured")
         self.name = name
         self._model = model
         # Local providers (Ollama) don't check the key; the SDK still wants
         # a non-empty string.
-        self._client = AsyncOpenAI(api_key=api_key or "not-required", base_url=base_url)
+        # ProviderRouter owns retries; SDK retries would multiply every attempt.
+        self._client = AsyncOpenAI(api_key=api_key or "not-required", base_url=base_url,
+                                   max_retries=0)
 
     async def complete(
         self,
@@ -37,12 +44,17 @@ class OpenAICompatibleLLMProvider(LLMProvider):
         try:
             response = await self._client.chat.completions.create(
                 model=self._model,
-                messages=[{"role": m.role, "content": m.content} for m in messages],
+                messages=[cast(ChatCompletionMessageParam, {"role": m.role, "content": m.content}) for m in messages],
                 max_tokens=max_tokens,
                 temperature=temperature,
             )
-        except (APIError, APIStatusError) as exc:
-            raise ProviderError(f"{self.name}: {exc}") from exc
+        except APIStatusError as exc:
+            reason = {401: "Invalid or expired API token", 403: "Token lacks inference permission or model access",
+                      402: "Inference credits exhausted; check provider billing", 404: "Model or endpoint unavailable",
+                      429: "Provider rate limit reached"}.get(exc.status_code, "Provider request failed")
+            raise ProviderError(f"{self.name}: HTTP {exc.status_code}: {reason}") from exc
+        except APIError as exc:
+            raise ProviderError(f"{self.name}: connection or timeout failure") from exc
 
         choice = response.choices[0]
         usage = response.usage

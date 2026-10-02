@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     openrouter_api_key: str | None = None
     together_api_key: str | None = None
     fireworks_api_key: str | None = None
+    hf_token: str | None = None
+    hf_model: str = "Qwen/Qwen3-4B-Instruct-2507:nscale"
+    hf_verify_model: str = "meta-llama/Llama-3.1-8B-Instruct:nscale"
     ollama_base_url: str = "http://localhost:11434/v1"
     # Two distinct models so generation and verification are genuinely
     # independent calls even when Ollama is the only working provider —

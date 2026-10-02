@@ -10,9 +10,8 @@ from __future__ import annotations
 
 import json
 import uuid as _uuid
-from datetime import datetime
 
-from sqlalchemy import DateTime, Float, Integer, String, Text, TypeDecorator
+from sqlalchemy import String, Text, TypeDecorator
 
 
 class PortableUUID(TypeDecorator):
