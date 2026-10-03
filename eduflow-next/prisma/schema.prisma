@@ -1,0 +1,458 @@
+// EduFlow Prisma Schema — direct translation of app/domain/models.py
+// Supports both SQLite (dev) and PostgreSQL (prod)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum NodeType {
+  topic
+  subtopic
+  objective
+}
+
+enum Origin {
+  official
+  teacher_defined
+  machine_extracted
+  machine_inferred
+}
+
+enum EdgeType {
+  prerequisite
+  assessed_by
+  covered_by
+  part_of
+}
+
+enum DocType {
+  textbook
+  past_paper
+  mark_scheme
+  syllabus
+  calendar
+}
+
+enum MappingMethod {
+  embedding
+  lexical
+  llm
+  hybrid
+  human_corrected
+}
+
+enum DayType {
+  school_day
+  non_teaching
+  exam_day
+}
+
+enum ScheduledUnitStatus {
+  planned
+  taught
+  moved
+  compressed
+  removed
+}
+
+enum MasteryStatus {
+  mastered
+  needs_reinforcement
+  reteach
+}
+
+enum VerificationStatus {
+  verified
+  unsupported
+  partially_supported
+  not_checked
+}
+
+// ─── Core Curriculum Models ───────────────────────────────────────────────────
+
+model CurriculumNode {
+  id          String   @id @default(uuid())
+  nodeType    NodeType @map("node_type")
+  label       String
+  description String?
+  syllabusRef String?  @map("syllabus_ref")
+  origin      Origin
+  confidence  Float
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  edges       CurriculumEdge[]        @relation("SourceEdges")
+  targetEdges CurriculumEdge[]        @relation("TargetEdges")
+  mappings    QuestionNodeMapping[]
+  mastery     ClassMasterySignal[]
+  units       TeachingUnit[]
+
+  @@map("curriculum_nodes")
+}
+
+model CurriculumEdge {
+  id           String   @id @default(uuid())
+  sourceNodeId String   @map("source_node_id")
+  targetNodeId String   @map("target_node_id")
+  edgeType     EdgeType @map("edge_type")
+  confidence   Float
+  origin       Origin
+  provenanceId String?  @map("provenance_id")
+
+  sourceNode  CurriculumNode @relation("SourceEdges", fields: [sourceNodeId], references: [id], onDelete: Cascade)
+  targetNode  CurriculumNode @relation("TargetEdges", fields: [targetNodeId], references: [id], onDelete: Cascade)
+  provenance  SourceSpan?    @relation(fields: [provenanceId], references: [id], onDelete: SetNull)
+
+  @@map("curriculum_edges")
+}
+
+// ─── Source Documents ─────────────────────────────────────────────────────────
+
+model SourceDocument {
+  id               String    @id @default(uuid())
+  title            String
+  docType          DocType   @map("doc_type")
+  filePath         String    @map("file_path")
+  ingestedAt       DateTime? @map("ingested_at")
+  parserUsed       String?   @map("parser_used")
+  parserConfidence Float?    @map("parser_confidence")
+
+  spans     SourceSpan[]
+  questions ExamQuestion[]
+  curricula SourceCurriculum?
+
+  @@map("source_documents")
+}
+
+model SourceSpan {
+  id          String @id @default(uuid())
+  documentId  String @map("document_id")
+  page        Int
+  blockId     String @map("block_id")
+  bbox        Json
+  text        String
+  contentHash String @map("content_hash")
+
+  document      SourceDocument       @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  edges         CurriculumEdge[]
+  questionSpans QuestionSpan[]
+  markSpans     MarkSchemeEntrySpan[]
+  claimEvidence ClaimEvidence[]
+
+  @@index([documentId, blockId])
+  @@map("source_spans")
+}
+
+model SourceCurriculum {
+  documentId   String @id @map("document_id")
+  fingerprint  String
+  nodeIds      Json   @map("node_ids")
+  metadataJson Json   @map("metadata_json")
+
+  document SourceDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@map("source_curricula")
+}
+
+// ─── Exam Questions ───────────────────────────────────────────────────────────
+
+model ExamQuestion {
+  id          String @id @default(uuid())
+  documentId  String @map("document_id")
+  questionRef String @map("question_ref")
+  text        String
+  marks       Int?
+  year        Int?
+  paperRef    String? @map("paper_ref")
+
+  document     SourceDocument      @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  markScheme   MarkSchemeEntry[]
+  mappings     QuestionNodeMapping[]
+  questionSpans QuestionSpan[]
+
+  @@unique([documentId, questionRef])
+  @@map("exam_questions")
+}
+
+model MarkSchemeEntry {
+  id              String   @id @default(uuid())
+  questionId      String   @map("question_id")
+  text            String
+  acceptableTerms Json?    @map("acceptable_terms")
+  marksAwarded    Int?     @map("marks_awarded")
+
+  question MarkSchemeEntry @relation("MarkSchemeEntries", fields: [questionId], references: [id], onDelete: Cascade)
+  children MarkSchemeEntry[] @relation("MarkSchemeEntries")
+  spans    MarkSchemeEntrySpan[]
+
+  @@map("mark_scheme_entries")
+}
+
+model QuestionSpan {
+  questionId   String @map("question_id")
+  sourceSpanId String @map("source_span_id")
+
+  question   ExamQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  sourceSpan SourceSpan   @relation(fields: [sourceSpanId], references: [id], onDelete: Cascade)
+
+  @@id([questionId, sourceSpanId])
+  @@map("question_spans")
+}
+
+model MarkSchemeEntrySpan {
+  markSchemeEntryId String @map("mark_scheme_entry_id")
+  sourceSpanId      String @map("source_span_id")
+
+  markSchemeEntry MarkSchemeEntry @relation(fields: [markSchemeEntryId], references: [id], onDelete: Cascade)
+  sourceSpan      SourceSpan     @relation(fields: [sourceSpanId], references: [id], onDelete: Cascade)
+
+  @@id([markSchemeEntryId, sourceSpanId])
+  @@map("mark_scheme_entry_spans")
+}
+
+model QuestionNodeMapping {
+  id            String        @id @default(uuid())
+  questionId    String        @map("question_id")
+  nodeId        String        @map("node_id")
+  weight        Float
+  confidence    Float
+  mappingMethod MappingMethod @map("mapping_method")
+  correctedBy   String?       @map("corrected_by")
+  createdAt     DateTime      @default(now()) @map("created_at")
+
+  question ExamQuestion   @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  node     CurriculumNode @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+
+  @@map("question_node_mappings")
+}
+
+// ─── Calendar & Planning ──────────────────────────────────────────────────────
+
+model AcademicCalendar {
+  id        String   @id @default(uuid())
+  schoolId  String   @map("school_id")
+  termStart DateTime @map("term_start") @db.Date
+  termEnd   DateTime @map("term_end") @db.Date
+
+  days     CalendarDay[]
+  plans    PlanVersion[]
+
+  @@map("academic_calendars")
+}
+
+model CalendarDay {
+  id         String  @id @default(uuid())
+  calendarId String  @map("calendar_id")
+  date       DateTime @db.Date
+  dayType    DayType @map("day_type")
+
+  calendar AcademicCalendar  @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+  windows  InstructionWindow[]
+
+  @@unique([calendarId, date])
+  @@map("calendar_days")
+}
+
+model InstructionWindow {
+  id               String  @id @default(uuid())
+  calendarDayId    String  @map("calendar_day_id")
+  subject          String
+  classId          String  @map("class_id")
+  startTime        DateTime @map("start_time") @db.Time()
+  endTime          DateTime @map("end_time") @db.Time()
+  availableMinutes Int     @map("available_minutes")
+  isAvailable      Boolean @default(true) @map("is_available")
+
+  calendarDay    CalendarDay    @relation(fields: [calendarDayId], references: [id], onDelete: Cascade)
+  scheduledUnits ScheduledUnit[]
+
+  @@index([calendarDayId, subject, classId])
+  @@map("instruction_windows")
+}
+
+model TeachingUnit {
+  id                    String  @id @default(uuid())
+  nodeId                String  @map("node_id")
+  durationMinutes       Int     @map("duration_minutes")
+  splittable            Boolean @default(false)
+  minimumSessionMinutes Int?    @map("minimum_session_minutes")
+  priority              Float
+  prerequisiteUnitIds   Json?   @map("prerequisite_unit_ids")
+
+  node           CurriculumNode  @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+  scheduledUnits ScheduledUnit[]
+
+  @@map("teaching_units")
+}
+
+model PlanVersion {
+  id              String    @id @default(uuid())
+  calendarId      String    @map("calendar_id")
+  parentVersionId String?   @map("parent_version_id")
+  triggerReason   String    @map("trigger_reason")
+  notes           String?
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  calendar       AcademicCalendar @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+  parentVersion  PlanVersion?     @relation("PlanVersions", fields: [parentVersionId], references: [id], onDelete: SetNull)
+  childVersions  PlanVersion[]    @relation("PlanVersions")
+  scheduledUnits ScheduledUnit[]
+  recoveryScenarios RecoveryScenario[] @relation("PlanRecovery")
+  appliedRecoveries RecoveryScenario[] @relation("AppliedRecovery")
+
+  @@map("plan_versions")
+}
+
+model ScheduledUnit {
+  id                  String              @id @default(uuid())
+  unitId              String              @map("unit_id")
+  instructionWindowId String              @map("instruction_window_id")
+  scheduledMinutes    Int                 @map("scheduled_minutes")
+  status              ScheduledUnitStatus
+  planVersion         String              @map("plan_version")
+
+  unit              TeachingUnit      @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  instructionWindow InstructionWindow @relation(fields: [instructionWindowId], references: [id], onDelete: Cascade)
+  plan              PlanVersion       @relation(fields: [planVersion], references: [id], onDelete: Cascade)
+  claims            Claim[]
+
+  @@index([planVersion, unitId])
+  @@map("scheduled_units")
+}
+
+model RecoveryScenario {
+  id            String  @id @default(uuid())
+  planId        String  @map("plan_id")
+  fingerprint   String
+  payload       Json
+  appliedPlanId String? @map("applied_plan_id")
+  appliedOption String? @map("applied_option")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  plan        PlanVersion  @relation("PlanRecovery", fields: [planId], references: [id])
+  appliedPlan PlanVersion? @relation("AppliedRecovery", fields: [appliedPlanId], references: [id])
+
+  @@map("recovery_scenarios")
+}
+
+// ─── Teacher Corrections & Mastery ────────────────────────────────────────────
+
+model TeacherCorrection {
+  id         String   @id @default(uuid())
+  entityType String   @map("entity_type")
+  entityId   String   @map("entity_id")
+  beforeValue Json    @map("before_value")
+  afterValue  Json    @map("after_value")
+  teacherId  String   @map("teacher_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([entityType, entityId])
+  @@map("teacher_corrections")
+}
+
+model ClassMasterySignal {
+  id        String        @id @default(uuid())
+  classId   String        @map("class_id")
+  nodeId    String        @map("node_id")
+  status    MasteryStatus
+  markedBy  String        @map("marked_by")
+  createdAt DateTime      @default(now()) @map("created_at")
+
+  node CurriculumNode @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+
+  @@map("class_mastery_signals")
+}
+
+// ─── Claims & Evidence ────────────────────────────────────────────────────────
+
+model Claim {
+  id                 String             @id @default(uuid())
+  scheduledUnitId    String?            @map("scheduled_unit_id")
+  text               String
+  generationModel    String             @map("generation_model")
+  verificationModel  String             @map("verification_model")
+  verificationStatus VerificationStatus @map("verification_status")
+  confidence         Float
+  createdAt          DateTime           @default(now()) @map("created_at")
+
+  scheduledUnit ScheduledUnit? @relation(fields: [scheduledUnitId], references: [id], onDelete: Cascade)
+  evidence      ClaimEvidence[]
+
+  @@map("claims")
+}
+
+model ClaimEvidence {
+  claimId      String @map("claim_id")
+  sourceSpanId String @map("source_span_id")
+
+  claim      Claim      @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  sourceSpan SourceSpan @relation(fields: [sourceSpanId], references: [id], onDelete: Cascade)
+
+  @@id([claimId, sourceSpanId])
+  @@map("claim_evidence")
+}
+
+// ─── Portal (Auth & Classroom) ────────────────────────────────────────────────
+
+model PortalUser {
+  id             String   @id @default(uuid())
+  name           String   @db.VarChar(120)
+  email          String   @unique @db.VarChar(255)
+  passwordHash   String   @map("password_hash") @db.VarChar(255)
+  role           String   @db.VarChar(12)
+  enrollmentCode String?  @unique @map("enrollment_code") @db.VarChar(16)
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  sessions           PortalSession[]
+  teacherEnrollments TeacherEnrollment[] @relation("TeacherEnrollments")
+  studentEnrollments TeacherEnrollment[] @relation("StudentEnrollments")
+  outlines           ClassOutline[]
+
+  @@map("portal_users")
+}
+
+model PortalSession {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  tokenHash String   @unique @map("token_hash") @db.VarChar(64)
+  expiresAt DateTime @map("expires_at")
+
+  user PortalUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("portal_sessions")
+}
+
+model TeacherEnrollment {
+  teacherId String @map("teacher_id")
+  studentId String @map("student_id")
+
+  teacher PortalUser @relation("TeacherEnrollments", fields: [teacherId], references: [id], onDelete: Cascade)
+  student PortalUser @relation("StudentEnrollments", fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@id([teacherId, studentId])
+  @@map("teacher_enrollments")
+}
+
+model ClassOutline {
+  id          String   @id @default(uuid())
+  teacherId   String   @map("teacher_id")
+  title       String   @db.VarChar(200)
+  subject     String   @db.VarChar(120)
+  content     String
+  sourceText  String?  @map("source_text")
+  published   Boolean  @default(false)
+  notes       String?
+  studyPlan   Json?    @map("study_plan")
+  generatedBy String?  @map("generated_by") @db.VarChar(200)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  teacher PortalUser @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  @@map("class_outlines")
+}
