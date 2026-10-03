@@ -8,13 +8,13 @@ from pathlib import Path
 from time import perf_counter
 from uuid import UUID
 
-from app.demo import TOPICS
 from app.domain.models import CurriculumNode, ExamQuestion, SourceSpan
 from app.generation.claims import GeneratedClaim
 from app.generation.evidence import check_evidence
 from app.ingestion.service import hash_span_text
 from app.mapping.mapper import EnsembleMapper
 from app.planning.scheduler import UnitInput, WindowInput, solve_schedule, validate_schedule
+from tests.demo_fixture import TOPICS
 
 
 def precision_at_k(predicted, expected, k):
