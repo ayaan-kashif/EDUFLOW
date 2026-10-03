@@ -14,6 +14,9 @@ import os
 import sys
 from pathlib import Path
 
+from sqlalchemy import inspect as sa_inspect
+from sqlalchemy import text
+
 # Ensure the project root is on the path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -40,8 +43,18 @@ async def main():
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-
-    from sqlalchemy import inspect as sa_inspect
+        # SQLite create_all does not alter existing tables. Keep local portal
+        # databases usable when a new nullable source field is introduced.
+        tables = await conn.run_sync(lambda sync_conn: sa_inspect(sync_conn).get_table_names())
+        if "class_outlines" in tables:
+            columns = await conn.run_sync(
+                lambda sync_conn: {c["name"] for c in sa_inspect(sync_conn).get_columns("class_outlines")}
+            )
+            if "source_text" not in columns:
+                await conn.execute(text("ALTER TABLE class_outlines ADD COLUMN source_text TEXT"))
+                await conn.execute(text(
+                    "UPDATE class_outlines SET notes = NULL, study_plan = NULL, generated_by = NULL"
+                ))
 
     async with engine.connect() as connection:
         tables = await connection.run_sync(lambda conn: sa_inspect(conn).get_table_names())

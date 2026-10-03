@@ -50,14 +50,7 @@ async def plan_summary(plan_id: UUID, session: AsyncSession = Depends(get_sessio
         return {}
 
 
-@router.post("/demo/studio")
-async def studio_demo(session: AsyncSession = Depends(get_session)):
-    from app.demo import seed_demo
-
-    return await seed_demo(session, reset_calendar=True)
-
-
-@router.post("/demo/public-syllabus")
+@router.post("/sources/public-syllabus")
 async def public_syllabus(session: AsyncSession = Depends(get_session)):
     from app.ingestion.service import IngestionService
     from app.providers.sources import BIOLOGY_SYLLABUS_URL, download_biology_syllabus
@@ -80,7 +73,7 @@ async def public_syllabus(session: AsyncSession = Depends(get_session)):
     except Exception as exc:
         raise HTTPException(
             502,
-            "Public syllabus download or parsing failed; upload a PDF manually or use the offline demo",
+            "Public syllabus download or parsing failed; upload a PDF manually",
         ) from exc
     return {"document_id": doc.id, "source_url": BIOLOGY_SYLLABUS_URL}
 

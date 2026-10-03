@@ -26,6 +26,12 @@ def _groq_provider():
     return GroqLLMProvider
 
 
+def _gemini_provider():
+    from app.providers.llm.gemini_provider import GeminiLLMProvider
+
+    return GeminiLLMProvider
+
+
 def _openrouter_provider():
     from app.providers.llm.openrouter_provider import OpenRouterLLMProvider
 
@@ -69,6 +75,7 @@ def _huggingface_verify_provider():
 
 
 _LLM_PROVIDERS: dict[str, Callable[[], type]] = {
+    "gemini": _gemini_provider,
     "huggingface": _huggingface_provider,
     "huggingface_verify": _huggingface_verify_provider,
     "anthropic": _anthropic_provider,

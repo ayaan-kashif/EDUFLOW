@@ -6,7 +6,7 @@ from urllib.parse import urlsplit
 from uuid import uuid4
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api.browse import router as browse_router
@@ -39,7 +39,7 @@ async def request_observability(request: Request, call_next):
         if origin and urlsplit(origin).netloc != request.url.netloc:
             return JSONResponse(status_code=403, content={"detail": "Invalid request origin"})
     if request.method == "POST" and request.url.path.startswith(
-        ("/planning", "/generation", "/ingestion", "/demo", "/studio", "/classroom")
+        ("/planning", "/generation", "/ingestion", "/sources", "/studio", "/classroom")
     ):
         client = request.client.host if request.client else "unknown"
         for key in list(REQUEST_HISTORY):
@@ -96,5 +96,28 @@ app.include_router(studio_router)
 app.include_router(control_router)
 app.include_router(jobs_router)
 
-# Minimal demo UI. Mounted last so it doesn't shadow any API route above.
-app.mount("/", StaticFiles(directory=Path(__file__).parent / "static", html=True), name="static")
+STATIC_DIR = Path(__file__).parent / "static"
+
+
+@app.get("/teacher", include_in_schema=False)
+async def teacher_page():
+    return FileResponse(STATIC_DIR / "teacher.html")
+
+
+@app.get("/student", include_in_schema=False)
+async def student_page():
+    return FileResponse(STATIC_DIR / "student.html")
+
+
+@app.get("/pipeline", include_in_schema=False)
+async def pipeline_page():
+    return FileResponse(STATIC_DIR / "pipeline.html")
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    return RedirectResponse("/favicon.svg")
+
+
+# Mounted last so the page aliases and API routes take precedence.
+app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")

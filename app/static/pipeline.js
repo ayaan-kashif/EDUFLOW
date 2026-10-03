@@ -38,6 +38,12 @@ const S = {
   set question(v) { try { localStorage.setItem('cos.q', v); } catch {} },
 };
 
+async function teacherIdentity() {
+  const response = await api('/classroom/me');
+  if (response.role !== 'teacher') throw new Error('Sign in through the teacher portal first.');
+  return response.id;
+}
+
 /* ---------- theme ---------- */
 (function theme() {
   let saved = null;
@@ -264,11 +270,12 @@ async function loadCorrectable() {
 async function correct(id, before) {
   const el = $('out-correctable'), after = +$('cw-' + id).value;
   try {
+    const teacherId = await teacherIdentity();
     await api('/corrections/', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         entity_type: 'question_node_mapping', entity_id: id,
-        before_value: { weight: before }, after_value: { weight: after }, teacher_id: 'demo-teacher',
+        before_value: { weight: before }, after_value: { weight: after }, teacher_id: teacherId,
       }),
     });
     await loadCorrectable();
@@ -310,9 +317,10 @@ async function updateMastery(signalId, nodeId) {
   const el = $('out-mastery'), classId = $('mast-class').value;
   const status = $('ms-' + signalId).value;
   try {
+    const teacherId = await teacherIdentity();
     await api('/mastery/', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ class_id: classId, node_id: nodeId, status, teacher_id: 'demo-teacher' }),
+      body: JSON.stringify({ class_id: classId, node_id: nodeId, status, teacher_id: teacherId }),
     });
     await loadMastery();
   } catch (e) { failed(el, e); }
@@ -336,9 +344,10 @@ $('btn-mastery').onclick = async () => {
   const el = $('out-mastery'), classId = $('mast-class').value, nodeId = $('mast-node').value;
   if (!classId || !nodeId) return said(el, 'Choose a class and objective', 'warn');
   try {
+    const teacherId = await teacherIdentity();
     await api('/mastery/', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ class_id: classId, node_id: nodeId, status: $('mast-status').value, teacher_id: 'demo-teacher' }),
+      body: JSON.stringify({ class_id: classId, node_id: nodeId, status: $('mast-status').value, teacher_id: teacherId }),
     });
     await loadMastery();
   } catch (e) { failed(el, e); }

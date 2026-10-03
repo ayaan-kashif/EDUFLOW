@@ -19,9 +19,9 @@
 
 llm:
   generation:
-    # Hosted inference is preferred when HF_TOKEN is configured.
+    # Use the configured Gemini model first, with Groq as fallback.
     # Unconfigured providers are skipped; Ollama remains the local fallback.
-    priority: [huggingface, anthropic, openai, groq, together, fireworks, openrouter, ollama]
+    priority: [gemini, groq, huggingface, anthropic, openai, together, fireworks, openrouter, ollama]
     retry:
       attempts: 3
       backoff_seconds: 2
@@ -36,7 +36,7 @@ llm:
     # in this package's __init__.py treats it as real independent
     # verification, not a model grading its own output. First entry must
     # differ from generation.priority[0].
-    priority: [huggingface_verify, openai, anthropic, groq, openrouter, ollama_verify]
+    priority: [groq, gemini, huggingface_verify, openai, anthropic, openrouter, ollama_verify]
     retry:
       attempts: 3
       backoff_seconds: 2

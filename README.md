@@ -2,19 +2,20 @@
 
 ## Teacher and student portals
 
-Open `/teacher.html` to create a teacher account. The teacher receives an eight-character
+Open `/teacher` to create a teacher account. The teacher receives an eight-character
 enrollment code, can save and edit outlines, publish them to enrolled students, and
-generate revision notes plus a seven-day study plan. Open `/student.html` to create a
+generate revision notes plus a seven-day study plan. Open `/student` to create a
 student account, enter the teacher's code, and view that teacher's published materials.
 Students may join multiple teachers. Edits return an outline to draft and clear its old
 AI materials until the teacher republishes and regenerates it.
 
-The **Generate notes and plan** action uses the configured generation provider in
-`config/providers.yaml`. Set `HF_TOKEN`, `OPENAI_API_KEY`, another supported provider key,
-or run Ollama with `OLLAMA_MODEL` pulled locally. Without a reachable model, outlines can
-still be published, but generation returns an explicit error. AI notes should be reviewed
-by the teacher before students rely on them; the generation prompt asks the model to flag
-gaps in a sparse outline.
+The **Generate notes and plan** action requires at least 200 characters of teacher-approved
+source text. Gemini drafts notes using only that source; Groq independently checks the
+draft against it. An unsupported draft is rejected, and no generated material is saved.
+Use `GEMINI_API_KEY` and `GROQ_API_KEY` for this two-provider flow. The supplied `gsk_`
+key is for **Groq**, which is different from xAI's Grok. The app does not use Google
+Scholar or a general research API. Teacher review remains necessary: independent AI
+verification reduces errors but cannot prove every statement is correct.
 
 On Windows, a clean local setup is:
 
@@ -26,11 +27,50 @@ Copy-Item .env.example .env
 .venv\Scripts\python.exe -m uvicorn app.main:app --reload
 ```
 
-Then visit <http://localhost:8000/teacher.html> or
-<http://localhost:8000/student.html>. For an existing PostgreSQL database, apply
+Then visit <http://localhost:8000/teacher> or
+<http://localhost:8000/student>. The older `.html` URLs remain available. For an existing PostgreSQL database, apply
 `alembic upgrade head` to create the new portal tables. The original planning workspace
 at `/` remains a hackathon prototype and its older API routes are not account scoped;
 use the new portals for teacher and student class sharing.
+
+### Deploying on Vercel
+
+Vercel runs this FastAPI app as a Python Function. It does not run the Dockerfile or
+`scripts/start_web.py`. Set these variables in the Vercel project's **Settings → Environment
+Variables** for each environment you deploy:
+
+| Variable | Needed for | Value |
+|---|---|---|
+| `DATABASE_URL` | Required for registration, enrollment, and saved materials | Supabase PostgreSQL **Session pooler** connection string, including the database password. Use port 5432 and add `?sslmode=require`. Do not use SQLite on Vercel. |
+| `GEMINI_API_KEY` | AI notes and study plans | Google Gemini API key. Used first for drafting. |
+| `GROQ_API_KEY` | Independent factual check | Groq inference API key. Used first for verification. |
+| `OPENAI_API_KEY` | Optional fallback | A key with API credits. A key with exhausted credits returns `429`. |
+| `HF_TOKEN` | Optional alternative AI provider | Hugging Face Inference Providers token with credits. |
+| `OPENROUTER_API_KEY` | Optional scanned-document OCR | Only needed for the vision OCR fallback in the older planning pipeline. |
+
+The teacher notes feature generates from the teacher-approved source and outline. It
+does not search the web or retrieve academic papers. Add `DATABASE_URL`, `GEMINI_API_KEY`,
+and `GROQ_API_KEY` in the Vercel dashboard, then redeploy. Local `.env` is not transferred
+to Vercel.
+
+For the linked Supabase project, open **Connect → Session pooler** in its dashboard and
+copy the full PostgreSQL URI. Replace `[YOUR-PASSWORD]` with the database password;
+percent-encode special characters in that password. Its shape is
+`postgresql://postgres.<project-ref>:<password>@<pooler-host>:5432/postgres?sslmode=require`.
+Use the actual pooler host shown in Supabase. `SUPABASE_URL`, the publishable key,
+the secret key, and the JWKS URL are for Supabase APIs/Auth and are not used when
+Supabase supplies PostgreSQL only. The supplied secret key was masked, so it could
+not be used. `@supabase/server` is a JavaScript package; this Python FastAPI app
+uses SQLAlchemy and does not need it. On Vercel, database connections use no local
+SQLAlchemy pool to avoid retaining idle connections in short-lived functions.
+
+The Vercel build script runs `alembic upgrade head` against `DATABASE_URL`, so the
+`portal_users` and related tables exist before the deployment becomes live. Leave any
+custom Vercel Build Command override unset so `[tool.vercel.scripts]` takes effect. After
+adding or changing environment variables, redeploy and check `/health/db`; it returns
+`ok` only when the portal table is accessible. The original source-upload pipeline still
+writes to local `uploads/` and needs durable object storage before it can work reliably on
+Vercel.
 
 > EduFlow ingests textbooks, past papers, mark schemes, and academic calendars to build a grounded, citable term plan — and automatically replans it when the calendar changes, while minimizing disruption to what's already been taught.
 
@@ -75,7 +115,7 @@ for the implemented features, evaluation results, and remaining production work.
 4. Verification must use a different provider/model than generation. A model does not grade its own homework; this is enforced at call time, not just in config.
 5. Minimizing replan churn is a first-class scheduling objective, not an afterthought.
 
-## Quick start (hackathon demo — no Docker needed)
+## Quick start (no Docker needed)
 
 Requires Python 3.11+. No Docker, no Postgres — uses SQLite.
 
@@ -86,17 +126,10 @@ DATABASE_URL=sqlite+aiosqlite:///./curriculumos.db python scripts/setup_sqlite.p
 uvicorn app.main:app --reload
 ```
 
-The original pipeline exercise is also available when its AI providers are configured:
-
-```bash
-python scripts/demo_seed.py   # exercises all 10 pipeline stages
-```
-
-For the provider-free presentation, open <http://localhost:8000> and select **Try the Biology demo**. This seeds
-original synthetic sources, mappings, a timetable, and inspectable claims without
-provider keys. The demo claims remain explicitly unchecked; they are not fabricated
-verification successes. **Load public syllabus** downloads the official Cambridge
-Biology syllabus when the network is available, then stores its extracted sources.
+The public demo seeding route and sample content have been removed. New accounts and
+workspaces start empty. The synthetic Biology fixture remains under `tests/fixtures/`
+for automated tests only. **Load official syllabus** downloads the Cambridge Biology
+syllabus when the network is available and stores its extracted sources.
 
 On Windows PowerShell, after creating and installing into a virtual environment:
 
@@ -143,7 +176,7 @@ Everything external is a swappable provider behind `app/providers/`, routed by
 | LLM verification | `huggingface_verify` → other cloud providers → `ollama_verify` | A distinct model is required; generation cannot verify itself. |
 | Embeddings | `qwen3-embedding:0.6b` via Ollama | 1024-dim, stored in pgvector on `curriculum_nodes.embedding`. |
 
-Only `DATABASE_URL` is strictly required. Every provider key is optional — the chains skip what isn't configured, so the app runs with a local Ollama and no cloud keys at all.
+Only `DATABASE_URL` is strictly required. Every provider key is optional — the chains skip what isn't configured, so the app can run with a local Ollama server and no cloud keys at all. Vercel does not provide that local Ollama server.
 
 For Hugging Face, set `HF_TOKEN` in the ignored `.env` file. `HF_MODEL` defaults to
 `Qwen/Qwen3-4B-Instruct-2507:nscale`; `HF_VERIFY_MODEL` uses a different Llama model.

@@ -14,5 +14,5 @@ RUN pip install --no-cache-dir -r requirements.txt psycopg2-binary
 # Copy app code
 COPY . .
 
-# Run migrations and start server
-CMD alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+# Initialize SQLite or migrate PostgreSQL before accepting traffic.
+CMD ["python", "scripts/start_web.py"]

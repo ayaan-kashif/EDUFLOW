@@ -81,11 +81,9 @@ against **eight** in the naive rebuilding baseline, with zero hard-constraint vi
 Latency is measured per run and should be read from the report. These numbers are
 regression evidence for the supplied fixtures, not broad competitive quality claims.
 
-`scripts/verify_studio.cjs` uses Playwright installed under `.runtime/browser` and a
-review server at port 8017. `STUDIO_BROWSER` can point to a Chromium executable;
-the default is the locally available Brave. It verifies the real demo, compression,
-lesson inspector, source highlights, audit, mobile overflow, and PDF export rendering.
-It writes screenshots and a verification report under ignored `.runtime/`.
+The public synthetic-data route and its browser scripts have been removed. The
+pipeline API regression tests in `tests/test_studio_api.py` and
+`tests/test_control_room.py` seed isolated fixtures directly in a test database.
 
 ## Remaining production and research work
 

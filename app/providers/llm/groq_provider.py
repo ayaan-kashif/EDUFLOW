@@ -4,7 +4,7 @@ from app.providers.llm.openai_compatible import OpenAICompatibleLLMProvider
 BASE_URL = "https://api.groq.com/openai/v1"
 # NOTE: verify against Groq's current model catalog before relying on this
 # — see the same caveat in openai_provider.py.
-DEFAULT_MODEL = "llama-3.3-70b-versatile"
+DEFAULT_MODEL = "openai/gpt-oss-120b"
 
 
 class GroqLLMProvider(OpenAICompatibleLLMProvider):

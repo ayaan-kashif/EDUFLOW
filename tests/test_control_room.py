@@ -4,11 +4,11 @@ from uuid import UUID, uuid4
 from sqlalchemy import select
 
 from app.domain.models import InstructionWindow, PlanVersion
-from tests.test_studio_api import studio_client  # noqa: F401
+from tests.test_studio_api import seed_test_demo, studio_client  # noqa: F401
 
 
-async def make_plan(client):
-    demo = (await client.post("/demo/studio")).json()
+async def make_plan(client, factory):
+    demo = await seed_test_demo(factory)
     response = await client.post(
         "/planning/plans",
         json={
@@ -22,7 +22,7 @@ async def make_plan(client):
 
 async def test_recovery_preview_is_read_only_and_apply_matches_review(studio_client):
     client, factory = studio_client
-    demo, plan = await make_plan(client)
+    demo, plan = await make_plan(client, factory)
     before = (await client.get("/planning/plans")).json()
     async with factory() as session:
         available = list((await session.execute(select(InstructionWindow.is_available))).scalars())
@@ -67,8 +67,8 @@ async def test_recovery_preview_is_read_only_and_apply_matches_review(studio_cli
 
 
 async def test_recovery_rejects_changed_history(studio_client):
-    client, _ = studio_client
-    _, plan = await make_plan(client)
+    client, factory = studio_client
+    _, plan = await make_plan(client, factory)
     preview = (
         await client.post(f"/studio/plans/{plan}/recovery", json={"dates": ["2026-10-08"]})
     ).json()
@@ -86,7 +86,7 @@ async def test_recovery_rejects_changed_history(studio_client):
 
 async def test_source_setup_is_scoped_and_reuses_units(studio_client):
     client, factory = studio_client
-    demo = (await client.post("/demo/studio")).json()
+    demo = await seed_test_demo(factory)
     response = await client.get(f"/studio/documents/{demo['document_id']}/curriculum")
     assert len(response.json()["nodes"]) == 10
     body = {
@@ -118,8 +118,8 @@ async def test_extraction_cache_reuses_and_invalidates_source(studio_client, mon
     from app.domain.models import SourceSpan
     from app.ingestion.curriculum_extraction import CurriculumExtractionService
 
-    client, factory = studio_client
-    demo = (await client.post("/demo/studio")).json()
+    _, factory = studio_client
+    demo = await seed_test_demo(factory)
     calls = []
 
     class Chain:

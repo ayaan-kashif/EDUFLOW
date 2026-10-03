@@ -1,6 +1,7 @@
 from datetime import date
 
 import pytest
+from fastapi.encoders import jsonable_encoder
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
@@ -10,6 +11,14 @@ from app.db import get_session
 from app.domain.base import Base
 from app.domain.models import PlanVersion, TeachingUnit
 from app.main import app
+
+
+async def seed_test_demo(factory):
+    """Synthetic fixtures stay in the test suite, outside public routes."""
+    from tests.demo_fixture import seed_demo
+
+    async with factory() as session:
+        return jsonable_encoder(await seed_demo(session, reset_calendar=True))
 
 
 def test_disruption_dates_are_explicit_and_deduplicated():
@@ -60,11 +69,9 @@ async def studio_client(tmp_path, monkeypatch):
 
 async def test_demo_plan_replan_audit_forecast_and_export_on_real_sqlite(studio_client):
     client, factory = studio_client
-    response = await client.post("/demo/studio")
-    assert response.status_code == 200, response.text
-    demo = response.json()
-    repeat = await client.post("/demo/studio")
-    assert repeat.json()["document_id"] == demo["document_id"]
+    demo = await seed_test_demo(factory)
+    repeat = await seed_test_demo(factory)
+    assert repeat["document_id"] == demo["document_id"]
     spans = await client.get(f"/documents/{demo['document_id']}/spans")
     assert len(spans.json()) == 10
     assert all(s["content_hash"].startswith("sha256:") for s in spans.json())
@@ -147,10 +154,10 @@ async def test_demo_plan_replan_audit_forecast_and_export_on_real_sqlite(studio_
 async def test_unknown_document_and_out_of_term_closure_are_rejected(studio_client):
     from uuid import uuid4
 
-    client, _ = studio_client
+    client, factory = studio_client
     missing = await client.get(f"/documents/{uuid4()}/file")
     assert missing.status_code == 404
-    demo = (await client.post("/demo/studio")).json()
+    demo = await seed_test_demo(factory)
     invalid = await client.post(
         f"/calendars/{demo['calendar_id']}/disruptions/preview",
         json={"text": "2027-01-01", "reference_date": "2026-10-05"},
@@ -173,7 +180,7 @@ async def test_ingestion_job_persists_pdf_and_emits_terminal_sse(studio_client, 
 
     monkeypatch.setattr(parsing, "get_parser_chain", lambda: LocalRouter())
     client, factory = studio_client
-    pdf = Path("app/static/demo-biology.pdf").read_bytes()
+    pdf = Path("tests/fixtures/demo-biology.pdf").read_bytes()
     response = await client.post(
         "/ingestion/jobs",
         data={"title": "Streamed source", "doc_type": "syllabus"},

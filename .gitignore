@@ -47,4 +47,5 @@ Thumbs.db
 .idea/
 .vscode/
 .codex/
+.vercel/
 .claude/uploads/

@@ -4,6 +4,10 @@ const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;',
 const state = {nodes: [], edges: [], docs: [], claims: [], rows: [], closures: [], source: null,
   plan: localStorage.getItem('studio-plan'), context: JSON.parse(localStorage.getItem('studio-context') || 'null'),
   emphasis: {}, diff: []};
+if (state.context?.synthetic) {
+  state.context = null; state.plan = null;
+  localStorage.removeItem('studio-context'); localStorage.removeItem('studio-plan');
+}
 let statusTimer;
 function notice(message, error = false, sticky = false) {
   clearTimeout(statusTimer); $('status').textContent = message; $('status').hidden = false;
@@ -59,7 +63,7 @@ function saveContext(context) {
   state.context = context; localStorage.setItem('studio-context', JSON.stringify(context));
   $('subject').value = context.subject; $('class-id').value = context.class_id;
   $('calendar').value = context.calendar_id; $('reference-date').value = context.reference_date;
-  $('demo-label').textContent = context.synthetic ? 'Biology demo · original synthetic fixtures' : 'Class-level planning by design.';
+  $('demo-label').textContent = 'Class-level planning by design.';
 }
 async function refresh() {
   const results = await Promise.allSettled([api('/stats'), api('/documents'), api('/curriculum-nodes'),
@@ -93,7 +97,7 @@ function renderDocuments() {
   $('documents').classList.remove('skeleton');
   const query=$('source-search').value.trim().toLowerCase();
   const matching=state.docs.filter(d=>(d.title+' '+d.doc_type).toLowerCase().includes(query));
-  $('documents').innerHTML = matching.length ? matching.map(d => `<button class="document ${state.source === d.id ? 'selected' : ''}" data-document="${d.id}"><strong>${esc(d.title)}</strong><small>${esc(d.doc_type.replaceAll('_',' '))} · ${d.span_count} passages</small></button>`).join('') : '<div class="empty"><p>No sources to show. Add a document, try the demo, or clear your search.</p></div>';
+  $('documents').innerHTML = matching.length ? matching.map(d => `<button class="document ${state.source === d.id ? 'selected' : ''}" data-document="${d.id}"><strong>${esc(d.title)}</strong><small>${esc(d.doc_type.replaceAll('_',' '))} · ${d.span_count} passages</small></button>`).join('') : '<div class="empty"><p>No sources to show. Add a document or clear your search.</p></div>';
   document.querySelectorAll('[data-document]').forEach(el => el.onclick = () => selectDocument(el.dataset.document).catch(e => notice(e.message,true)));
 }
 async function selectDocument(id) {
@@ -142,7 +146,7 @@ $('extract').onclick = () => run($('extract'), 'Extracting objectives…', async
   await api(`/ingestion/documents/${state.source}/curriculum`, {}); await refresh(); await selectDocument(state.source);
 });
 $('public-syllabus').onclick=()=>run($('public-syllabus'),'Loading public syllabus…',async()=>{
-  const result=await api('/demo/public-syllabus',{});await refresh();await selectDocument(result.document_id);
+  const result=await api('/sources/public-syllabus',{});await refresh();await selectDocument(result.document_id);
 });
 async function requestBody(parent = null) {
   const units = await api('/teaching-units');
@@ -171,11 +175,6 @@ async function buildPlan(parent = null) {
   await loadPlan(); metrics(result); renderDiff(); await refresh(); view('plan');
 }
 $('build').onclick = () => run($('build'), 'Finding the best fit…', () => buildPlan());
-$('demo').onclick = () => run($('demo'), 'Preparing Biology demo…', async () => {
-  const context = await api('/demo/studio', {}); await refresh(); saveContext(context);
-  await selectDocument(context.document_id); $('disruption').value = 'Snow day Thursday + sports day next Tuesday';
-  $('duration-ratio').value = '0.66'; await buildPlan();
-});
 async function loadPlan() {
   if (!state.plan) return;
   const report = await api(`/studio/plans/${state.plan}/coverage`);
@@ -266,12 +265,12 @@ $('ics').onclick=()=>{if (!state.plan) return notice('Build a plan first.',true)
 $('print').onclick=()=>{if (!state.plan) return notice('Load a plan first.',true);window.location.href=`/planning/plans/${state.plan}/export.pdf`;};
 async function loadClaims() {
   state.claims=await api('/claims');
-  $('claims').innerHTML=state.claims.length?state.claims.map(c=>`<button class="claim" data-claim="${c.id}"><span class="status-tag ${esc(c.verification_status)}">${esc(c.verification_status.replaceAll('_',' '))}</span><p>${esc(c.text)}</p><small>${c.citations.length} source passages · ${Math.round(c.confidence*100)}% verifier confidence · inspect ↗</small></button>`).join(''):'<div class="empty"><h3>Evidence comes first.</h3><p>Generated claims will appear here with their verification status. Try the demo for inspectable source fixtures.</p></div>';
+  $('claims').innerHTML=state.claims.length?state.claims.map(c=>`<button class="claim" data-claim="${c.id}"><span class="status-tag ${esc(c.verification_status)}">${esc(c.verification_status.replaceAll('_',' '))}</span><p>${esc(c.text)}</p><small>${c.citations.length} source passages · ${Math.round(c.confidence*100)}% verifier confidence · inspect ↗</small></button>`).join(''):'<div class="empty"><h3>Evidence comes first.</h3><p>Generated claims will appear here with their verification status after you add source material.</p></div>';
   $('claims').querySelectorAll('[data-claim]').forEach(el=>el.onclick=async()=>{
     try {const spans=await api(`/evidence/claims/${el.dataset.claim}`);await openEvidence(spans,state.claims.find(c=>c.id===el.dataset.claim));}catch(e){notice(e.message,true);}
   });
   const health=await api('/health/providers');
-  $('provider-health').innerHTML=health.events.length?health.events.slice(-5).reverse().map(e=>`<p>${esc(e.provider)} · ${esc(e.status)} · ${e.elapsed_ms} ms${e.circuit_open?' · circuit open':''}</p>`).join(''):'No provider calls yet. The sample demo works without external AI.';
+  $('provider-health').innerHTML=health.events.length?health.events.slice(-5).reverse().map(e=>`<p>${esc(e.provider)} · ${esc(e.status)} · ${e.elapsed_ms} ms${e.circuit_open?' · circuit open':''}</p>`).join(''):'No provider calls yet.';
 }
 $('reload-claims').onclick=()=>run($('reload-claims'),'Loading claims…',loadClaims);
 $('generate').onclick=()=>run($('generate'),'Retrieving, drafting, and verifying…',async()=>{

@@ -81,7 +81,7 @@ TOPICS = [
 
 async def seed_demo(session, *, reset_calendar=False):
     title = "Biology studio demo — original synthetic teaching notes"
-    fixture = Path(__file__).parent / "static/demo-biology.pdf"
+    fixture = Path(__file__).resolve().parent / "fixtures/demo-biology.pdf"
     upload_dir = Path(__file__).resolve().parent.parent / "uploads"
     upload_dir.mkdir(exist_ok=True)
     source_pdf = upload_dir / "original-biology-demo.pdf"

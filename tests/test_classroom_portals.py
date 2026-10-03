@@ -58,6 +58,13 @@ def test_teacher_student_flow_and_isolation(tmp_path, monkeypatch):
             assert student.post("/classroom/student/enroll", json={"code": code.lower()}).status_code == 200
             assert student.get("/classroom/student/outlines").json() == []  # draft
             assert teacher.post(f"/classroom/teacher/outlines/{outline_id}/publish").status_code == 200
+            assert teacher.post(f"/classroom/teacher/outlines/{outline_id}/generate").status_code == 422
+            assert teacher.put(f"/classroom/teacher/outlines/{outline_id}", json={
+                "title": "Cell Biology", "subject": "Biology",
+                "content": "Organelles and their functions; plant and animal cells.",
+                "source_text": "Cells contain a membrane, cytoplasm and genetic material. " * 5,
+            }).status_code == 200
+            assert teacher.post(f"/classroom/teacher/outlines/{outline_id}/publish").status_code == 200
             assert teacher.post(f"/classroom/teacher/outlines/{outline_id}/generate").status_code == 200
             material = student.get("/classroom/student/outlines").json()
             assert len(material) == 1
@@ -87,17 +94,25 @@ def test_ai_material_contract(monkeypatch):
 
     class FakeProvider:
         async def complete(self, messages, **kwargs):
-            assert "Organelles" in messages[1].content
-            return LLMResponse(text=json.dumps(payload), model="demo", provider="fake",
+            if "Check the draft" in messages[1].content:
+                response = {"supported": True, "unsupported_claims": []}
+                provider = "checker"
+            else:
+                assert "Organelles" in messages[1].content
+                response = payload
+                provider = "writer"
+            return LLMResponse(text=json.dumps(response), model="test", provider=provider,
                                input_tokens=10, output_tokens=100)
 
     class FakeChain:
-        async def call(self, fn):
+        async def call(self, fn, **kwargs):
             return await fn(FakeProvider())
 
     monkeypatch.setattr(llm, "get_generation_chain", lambda: FakeChain())
-    outline = classroom.ClassOutline(title="Cells", subject="Biology", content="Organelles")
+    monkeypatch.setattr(llm, "get_verification_chain", lambda: FakeChain())
+    outline = classroom.ClassOutline(title="Cells", subject="Biology", content="Organelles",
+                                     source_text="Cells contain organelles and a membrane. " * 7)
     notes, plan, generated_by = asyncio.run(classroom.generate_material(outline))
     assert notes.startswith("# Cells")
     assert len(plan["days"]) == 7
-    assert generated_by == "fake / demo"
+    assert generated_by == "writer / test; checked by checker / test"

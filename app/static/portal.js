@@ -80,6 +80,11 @@
     const details = document.createElement('details');
     details.append(text('summary', 'Teacher outline'), text('pre', outline.content));
     card.append(details);
+    if (outline.source_text) {
+      const source = document.createElement('details');
+      source.append(text('summary', 'Teacher-approved source'), text('pre', outline.source_text));
+      card.append(source);
+    }
     if (outline.notes) {
       const notes = document.createElement('details');
       notes.append(text('summary', 'Revision notes'), text('pre', outline.notes));
@@ -95,6 +100,7 @@
         form.elements.title.value = outline.title;
         form.elements.subject.value = outline.subject;
         form.elements.content.value = outline.content;
+        form.elements.source_text.value = outline.source_text || '';
         state.editing = outline.id;
         form.querySelector('button[type=submit]').textContent = 'Save changes';
         form.scrollIntoView({behavior: 'smooth'});
@@ -148,7 +154,7 @@
       const body = {email: form.elements.email.value, password: form.elements.password.value};
       if (state.mode === 'register') Object.assign(body, {name: form.elements.name.value, role});
       const user = await api(`/${state.mode}`, {method: 'POST', body: JSON.stringify(body)});
-      if (user.role !== role) { location.href = `/${user.role}.html`; return; }
+      if (user.role !== role) { location.href = `/${user.role}`; return; }
       setUser(user); await refresh(); show('You are signed in.');
     });
   };
@@ -163,7 +169,7 @@
     $('outline-form').onsubmit = event => {
       event.preventDefault(); const form = event.currentTarget;
       busy(form.querySelector('button[type=submit]'), async () => {
-        const body = JSON.stringify({title: form.elements.title.value, subject: form.elements.subject.value, content: form.elements.content.value});
+        const body = JSON.stringify({title: form.elements.title.value, subject: form.elements.subject.value, content: form.elements.content.value, source_text: form.elements.source_text.value});
         const path = state.editing ? `/teacher/outlines/${state.editing}` : '/teacher/outlines';
         await api(path, {method: state.editing ? 'PUT' : 'POST', body});
         form.reset(); state.editing = null;
@@ -181,7 +187,7 @@
     };
   }
   api('/me').then(user => {
-    if (user.role !== role) { location.href = `/${user.role}.html`; return; }
+    if (user.role !== role) { location.href = `/${user.role}`; return; }
     setUser(user); return refresh();
   }).catch(error => { if (!error.message.includes('Sign in') && !error.message.includes('Session expired')) show(error.message, true); });
 })();

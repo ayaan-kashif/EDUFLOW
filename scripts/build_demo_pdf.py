@@ -9,9 +9,9 @@ from reportlab.lib.colors import HexColor
 from reportlab.lib.utils import simpleSplit
 from reportlab.pdfgen import canvas
 
-from app.demo import TOPICS
+from tests.demo_fixture import TOPICS
 
-path = Path(__file__).resolve().parent.parent / 'app/static/demo-biology.pdf'
+path = Path(__file__).resolve().parent.parent / 'tests/fixtures/demo-biology.pdf'
 pdf = canvas.Canvas(str(path), pagesize=(595,842))
 pdf.setTitle('EduFlow - Original Biology Demo Notes')
 pdf.setAuthor('EduFlow demo fixtures')

@@ -535,6 +535,7 @@ class ClassOutline(UUIDPk, CreatedAtMixin, Base):
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     subject: Mapped[str] = mapped_column(String(120), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
+    source_text: Mapped[str | None] = mapped_column(Text)
     published: Mapped[bool] = mapped_column(nullable=False, default=False)
     notes: Mapped[str | None] = mapped_column(Text)
     study_plan: Mapped[dict | None] = mapped_column(PortableJSON())
