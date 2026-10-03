@@ -1,34 +1,38 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# EduFlow Next.js app
 
-## Getting Started
+## Routes
 
-First, run the development server:
+- `/`: classroom landing page; signed-in teachers can see stored workspace records.
+- `/teacher`: teacher account, enrollment code, outlines, AI notes and study plans.
+- `/student`: student account, teacher-code enrollment, published materials.
+- `/pipeline`: current classroom workflow and teacher-only provider telemetry.
+- `/api/health`: database readiness; 200 means the portal table is accessible.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+All classroom reads and writes use the server-only Supabase secret key. Public
+Supabase keys are not required by this app. The SQL schema denies browser roles
+direct access to classroom tables. Teacher/student authorization is enforced in
+the Next.js API routes using an HTTP-only session cookie.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Setup
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. Run `supabase-schema.sql` in the Supabase SQL Editor. Re-run it if you used
+   an older copy because it now removes permissive policies.
+2. Copy `.env.example` to `.env.local` and fill in the project URL, complete
+   server-side secret key, Gemini key, and Groq key.
+3. Run `npm install` and `npm run dev`, then open `http://localhost:3000`.
+4. Run `npm run build` to check the production build.
 
-## Learn More
+The app does not automatically create Supabase tables at runtime. Missing schema
+or credentials make `/api/health` return 503. Never commit `.env.local` or
+put `SUPABASE_SECRET_KEY` in a `NEXT_PUBLIC_` variable.
 
-To learn more about Next.js, take a look at the following resources:
+## Optional data migration
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+`npm run migrate:supabase` copies users, outlines, and enrollments from the old
+local SQLite file into Supabase. Use it only when you have existing local data
+to keep, after setting `DATABASE_URL=file:...` to that file. It does not
+migrate the old session tokens, so users must sign in again.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+AI generation uses the teacher's approved source. A second provider checks the
+draft; generation fails without a valid independent review. A teacher should
+still inspect the result before publishing it.

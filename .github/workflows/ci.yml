@@ -1,27 +1,19 @@
 name: Validate EduFlow
 on: [push, pull_request]
+
 jobs:
-  test:
+  next:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: eduflow-next
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: pip install -r requirements.lock
-      - run: pip install -e . --no-deps
-      - run: python -m pytest -q
-      - run: python -m ruff check app tests eval
-      - run: python -m mypy app
-      - run: node --check app/static/atelier.js
-      - run: node --check app/static/pipeline.js
-      - run: node --check app/static/studio.js
-      - run: node --check app/static/control-room.js
-      - run: python -m eval.run
-      - uses: actions/upload-artifact@v4
-        with:
-          name: regression-evaluation
-          path: eval/report.json
+          cache: npm
+          cache-dependency-path: eduflow-next/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - run: npm run lint

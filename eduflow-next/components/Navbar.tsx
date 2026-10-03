@@ -27,7 +27,7 @@ export function Navbar() {
     // Initial theme
     const saved = localStorage.getItem("eduflow_theme") as "light" | "dark" | null;
     const initial = saved || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
-    setTheme(initial);
+    queueMicrotask(() => setTheme(initial));
     document.documentElement.setAttribute("data-theme", initial);
 
     // Check health
@@ -35,7 +35,7 @@ export function Navbar() {
       .then((r) => r.json())
       .then((d) => {
         setHealthStatus(d.status === "healthy" ? "healthy" : "error");
-        setSupabaseStatus(d.supabase?.status === "connected");
+        setSupabaseStatus(d.database === "connected");
       })
       .catch(() => {
         setHealthStatus("error");

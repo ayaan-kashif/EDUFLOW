@@ -33,12 +33,6 @@ export default function StudentPage() {
 
   useEffect(() => {
     loadUser();
-    const saved = localStorage.getItem("eduflow_completed_tasks");
-    if (saved) {
-      try {
-        setCompletedTasks(JSON.parse(saved));
-      } catch {}
-    }
   }, []);
 
   async function loadUser() {
@@ -49,6 +43,12 @@ export default function StudentPage() {
         const u = await res.json();
         if (u.role === "student") {
           setUser(u);
+          const saved = localStorage.getItem(`eduflow_completed_tasks_${u.id}`);
+          try {
+            setCompletedTasks(saved ? JSON.parse(saved) : {});
+          } catch {
+            setCompletedTasks({});
+          }
           loadStudentData();
         } else {
           setErrorMsg("You are signed in as a teacher. Sign out to access the student portal.");
@@ -137,9 +137,10 @@ export default function StudentPage() {
   }
 
   const toggleTask = (taskId: string) => {
+    if (!user) return;
     const next = { ...completedTasks, [taskId]: !completedTasks[taskId] };
     setCompletedTasks(next);
-    localStorage.setItem("eduflow_completed_tasks", JSON.stringify(next));
+    localStorage.setItem(`eduflow_completed_tasks_${user.id}`, JSON.stringify(next));
   };
 
   if (loading) {
@@ -163,7 +164,7 @@ export default function StudentPage() {
               {authMode === "login" ? "Welcome Back, Student" : "Create Student Account"}
             </h1>
             <p style={{ color: "var(--soft)", fontSize: "14px", marginTop: "6px" }}>
-              Access teacher-curated notes, grounded revision guides, and structured 7-day study plans.
+              Access teacher-curated notes, AI-reviewed revision guides, and structured 7-day study plans.
             </p>
           </div>
 
@@ -258,7 +259,7 @@ export default function StudentPage() {
             Hello, {user.name}
           </h1>
           <p style={{ color: "var(--soft)", fontSize: "14px" }}>
-            Your personalized study hub with verified revision notes and daily goals.
+            Your personalized study hub with teacher-published revision notes and daily goals.
           </p>
         </div>
 
@@ -270,7 +271,7 @@ export default function StudentPage() {
           >
             <div>
               <span style={{ fontSize: "11px", fontWeight: "700", color: "var(--soft)", textTransform: "uppercase", display: "block" }}>
-                Join Teacher's Class
+                Join Teacher&apos;s Class
               </span>
               <input
                 type="text"
@@ -325,7 +326,7 @@ export default function StudentPage() {
               <GraduationCap size={40} color="var(--soft)" style={{ margin: "0 auto 12px" }} />
               <h3 style={{ fontSize: "17px", fontWeight: "700" }}>No Materials Yet</h3>
               <p style={{ color: "var(--soft)", fontSize: "13px", maxWidth: "400px", margin: "6px auto 0" }}>
-                Ask your teacher for their enrollment code to join their classroom and receive verified notes and 7-day study plans.
+                Ask your teacher for their enrollment code to join their classroom and receive notes and 7-day study plans.
               </p>
             </div>
           ) : (

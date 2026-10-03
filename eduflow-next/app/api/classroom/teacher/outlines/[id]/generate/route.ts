@@ -79,6 +79,14 @@ ${source}`;
     if (!Array.isArray(plan) || plan.length !== 7) {
       throw new Error("AI response did not contain a 7-day study plan array.");
     }
+    if (!parsedGen.notes_markdown.trim() || !plan.every((day, index) =>
+      day && day.day === index + 1 && typeof day.focus === "string" &&
+      Array.isArray(day.tasks) && day.tasks.length > 0 &&
+      day.tasks.every((task: unknown) => typeof task === "string" && task.trim().length > 0) &&
+      Number.isInteger(day.minutes) && day.minutes > 0
+    )) {
+      throw new Error("AI response contained incomplete notes or an invalid study plan.");
+    }
 
     // 2. Verification Step (Dual-stage verify-then-render pipeline)
     const verifyPrompt = `Check the draft notes and study plan against the teacher-approved source.
@@ -93,34 +101,27 @@ ${source}
 DRAFT:
 ${genRes.text}`;
 
-    let verificationVerdict = { supported: true, unsupported_claims: [] };
-    let verifyProviderName = genRes.provider;
-
-    try {
-      const verifyRes = await chain.complete(
-        [
-          { role: "system", content: "You verify factual support against supplied text. Return JSON only." },
-          { role: "user", content: verifyPrompt },
-        ],
-        { maxTokens: 1000, temperature: 0 }
-      );
-      verifyProviderName = verifyRes.provider;
-      const parsedVerify = extractJSON(verifyRes.text);
-      if (parsedVerify && typeof parsedVerify.supported === "boolean") {
-        verificationVerdict = parsedVerify;
-      }
-    } catch (vErr) {
-      console.warn("Verification sub-call warned, accepting draft if well-formed:", vErr);
+    const verifyRes = await chain.complete(
+      [
+        { role: "system", content: "You verify factual support against supplied text. Return JSON only." },
+        { role: "user", content: verifyPrompt },
+      ],
+      { maxTokens: 1000, temperature: 0, excludeProvider: genRes.provider }
+    );
+    const verificationVerdict = extractJSON(verifyRes.text);
+    if (typeof verificationVerdict?.supported !== "boolean" ||
+        !Array.isArray(verificationVerdict.unsupported_claims) ||
+        !verificationVerdict.unsupported_claims.every((claim: unknown) => typeof claim === "string")) {
+      throw new Error("AI verification returned an invalid response; draft was not saved.");
     }
-
-    if (!verificationVerdict.supported && verificationVerdict.unsupported_claims.length > 0) {
+    if (!verificationVerdict.supported || verificationVerdict.unsupported_claims.length > 0) {
       throw new Error(
-        `AI draft contained unsupported claims: ${verificationVerdict.unsupported_claims.join(", ")}. Please review or expand the source material.`
+        `AI draft was not fully supported by the source: ${verificationVerdict.unsupported_claims.join(", ")}. Please review or expand the source material.`
       );
     }
 
     const notes = parsedGen.notes_markdown.trim();
-    const generatedBy = `${genRes.provider} / ${genRes.model}; checked by ${verifyProviderName}`;
+    const generatedBy = `${genRes.provider} / ${genRes.model}; checked by ${verifyRes.provider} / ${verifyRes.model}`;
 
     await updateOutline(id, {
       title: outline.title,

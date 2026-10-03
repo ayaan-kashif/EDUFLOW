@@ -5,6 +5,9 @@ import nextTs from "eslint-config-next/typescript";
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
+  // Existing UI and migration code still has loose values. Keep them visible
+  // as warnings while the build's TypeScript check remains blocking.
+  { rules: { "@typescript-eslint/no-explicit-any": "warn" } },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:

@@ -40,6 +40,12 @@ export function getSupabaseClient(): SupabaseClient {
  * Privileged admin client for server-side API routes.
  */
 export function getSupabaseAdmin(): SupabaseClient {
+  if (!/^https:\/\/[^/]+\.supabase\.co$/.test(supabaseUrl)) {
+    throw new Error("SUPABASE_URL must be the project URL");
+  }
+  if (!/^(sb_secret_[A-Za-z0-9_-]+|eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)$/.test(supabaseSecretKey)) {
+    throw new Error("SUPABASE_SECRET_KEY must be a complete server-side key");
+  }
   if (!adminInstance) {
     adminInstance = createClient(supabaseUrl, supabaseSecretKey, {
       auth: {
@@ -77,29 +83,22 @@ export async function isSupabaseReady(): Promise<boolean> {
  */
 export async function checkSupabaseHealth(): Promise<{
   connected: boolean;
-  url: string;
   tablesReady: boolean;
   error?: string;
 }> {
   try {
-    const res = await fetch(`${supabaseUrl}/rest/v1/`, {
-      headers: {
-        apikey: supabaseSecretKey,
-        Authorization: `Bearer ${supabaseSecretKey}`,
-      },
-    });
-    const ready = await isSupabaseReady();
+    const admin = getSupabaseAdmin();
+    const { error } = await admin.from("portal_users").select("id").limit(1);
     return {
-      connected: res.ok,
-      url: supabaseUrl,
-      tablesReady: ready,
+      connected: !error,
+      tablesReady: !error,
+      ...(error ? { error: error.message } : {}),
     };
-  } catch (err: any) {
+  } catch (err) {
     return {
       connected: false,
-      url: supabaseUrl,
       tablesReady: false,
-      error: err.message,
+      error: err instanceof Error ? err.message : "Supabase unavailable",
     };
   }
 }

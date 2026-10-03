@@ -28,7 +28,10 @@ export default function WorkspacePage() {
     fetch("/api/studio/workspace")
       .then((r) => r.json())
       .then((d) => setData(d))
-      .catch((e) => console.error(e))
+      .catch((e) => {
+        console.error(e);
+        setData({ error: "Workspace unavailable" });
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -43,6 +46,27 @@ export default function WorkspacePage() {
   const nodes = data?.nodes || [];
   const units = data?.scheduledUnits || [];
   const claims = data?.claims || [];
+
+  if (!loading && data?.error) {
+    return (
+      <div className="page-container">
+        <section className="card" style={{ padding: "clamp(28px, 5vw, 56px)", maxWidth: "900px", margin: "36px auto" }}>
+          <span className="badge info">EduFlow Classroom</span>
+          <h1 style={{ fontFamily: "var(--display)", fontSize: "clamp(32px, 5vw, 56px)", margin: "18px 0" }}>
+            From lesson outline to a focused study plan.
+          </h1>
+          <p style={{ color: "var(--soft)", fontSize: "17px", lineHeight: 1.6 }}>
+            Teachers add an outline and approved source material. EduFlow drafts notes and a seven-day plan,
+            checks the draft with a second AI provider, then shares it with enrolled students after publishing.
+          </p>
+          <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginTop: "26px" }}>
+            <Link href="/teacher" className="primary">Open Teacher Portal</Link>
+            <Link href="/student" className="outline-btn">Open Student Portal</Link>
+          </div>
+        </section>
+      </div>
+    );
+  }
 
   return (
     <div className="page-container">
@@ -61,7 +85,7 @@ export default function WorkspacePage() {
         <div style={{ maxWidth: "760px", position: "relative", zIndex: 2 }}>
           <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "12px" }}>
             <span className="badge info">EduFlow Atelier 2.0</span>
-            <span className="badge ok">Live Production Engine</span>
+            <span className="badge info">Teacher Workspace</span>
           </div>
           <h1
             style={{
@@ -73,11 +97,11 @@ export default function WorkspacePage() {
               marginBottom: "14px",
             }}
           >
-            Curriculum Decomposition & Resilient Scheduling
+            Your Classroom Workspace
           </h1>
           <p style={{ color: "var(--soft)", fontSize: "16px", lineHeight: "1.6", marginBottom: "24px" }}>
-            Extract atomic competencies from source documents, assemble prerequisite graphs,
-            and generate constraint-optimized academic schedules with zero factual hallucinations.
+            Review curriculum records and classroom planning data stored in the shared database.
+            Create and publish source-guided student materials in the Teacher Portal.
           </p>
 
           <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
@@ -87,7 +111,7 @@ export default function WorkspacePage() {
             </Link>
             <Link href="/pipeline" className="outline-btn" style={{ padding: "11px 20px" }}>
               <Network size={16} />
-              <span>Inspect 10-Stage Pipeline</span>
+              <span>View Classroom Workflow</span>
             </Link>
           </div>
         </div>
@@ -111,7 +135,7 @@ export default function WorkspacePage() {
             {stats.nodeCount}
           </div>
           <span style={{ fontSize: "11px", color: "var(--ok)", fontWeight: "600" }}>
-            {stats.nodeCount > 0 ? "DAG Verified" : "Awaiting Data"}
+            {stats.nodeCount > 0 ? "Stored in workspace" : "Awaiting Data"}
           </span>
         </div>
 
@@ -134,7 +158,7 @@ export default function WorkspacePage() {
           <div style={{ fontSize: "32px", fontWeight: "800", marginTop: "6px" }}>
             {units.length}
           </div>
-          <span style={{ fontSize: "11px", color: "var(--ok)" }}>Constraint Optimized</span>
+          <span style={{ fontSize: "11px", color: "var(--soft)" }}>Stored schedule records</span>
         </div>
 
         <div className="card" style={{ padding: "18px 22px" }}>
@@ -145,7 +169,7 @@ export default function WorkspacePage() {
           <div style={{ fontSize: "32px", fontWeight: "800", marginTop: "6px" }}>
             {claims.filter((c: any) => c.verification_status === "verified").length} / {claims.length}
           </div>
-          <span style={{ fontSize: "11px", color: "var(--ok)" }}>Factual Verification</span>
+          <span style={{ fontSize: "11px", color: "var(--soft)" }}>Recorded claim status</span>
         </div>
       </div>
 
@@ -279,7 +303,7 @@ export default function WorkspacePage() {
                   No Teaching Units Scheduled
                 </h3>
                 <p style={{ fontSize: "13px", maxWidth: "440px", margin: "0 auto" }}>
-                  No teaching units are currently allocated in the academic schedule. Run constraint optimization to schedule curriculum topics.
+                  No teaching units are currently stored in the academic schedule.
                 </p>
               </div>
             ) : (
@@ -326,7 +350,7 @@ export default function WorkspacePage() {
             <div>
               <h2 className="card-title">Instructional Claims & Factual Verification Ledger</h2>
               <p style={{ color: "var(--soft)", fontSize: "13px", marginTop: "4px" }}>
-                Every instructional sentence is checked against ingested source spans. Hallucinations are actively intercepted.
+                This ledger shows any claim records stored in the database. AI notes are reviewed separately before saving.
               </p>
             </div>
           </div>
@@ -338,7 +362,7 @@ export default function WorkspacePage() {
                 No Claims Recorded Yet
               </h3>
               <p style={{ fontSize: "13px", maxWidth: "440px", margin: "0 auto 16px" }}>
-                Claims are generated and verified during AI study guide generation in the Teacher Portal. Generate a lesson outline with attached source material to view verification audits.
+                No claim records are stored here. Classroom notes and study plans are available in the Teacher Portal.
               </p>
               <Link href="/teacher" className="primary" style={{ padding: "8px 16px", fontSize: "12px", display: "inline-flex" }}>
                 <Sparkles size={14} />

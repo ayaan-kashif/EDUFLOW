@@ -28,73 +28,31 @@ export default function PipelinePage() {
   const stages = [
     {
       num: 1,
-      title: "Document Ingestion",
-      desc: "Multi-format parsing (PDF, DOCX, Syllabi) into structural elements with SHA-256 provenance.",
-      category: "Ingestion",
+      title: "Teacher Outline",
+      desc: "The teacher creates the lesson outline and adds approved source material.",
+      category: "Authoring",
       status: "Ready",
     },
     {
       num: 2,
-      title: "Structural Span Extraction",
-      desc: "Deconstructs documents into page-bounded bounding-box spans with reading-order preservation.",
-      category: "Parsing",
-      status: "Active",
+      title: "Source-Guided Draft",
+      desc: "An AI provider drafts notes and a seven-day plan using the teacher's source text.",
+      category: "AI Generation",
+      status: "Available",
     },
     {
       num: 3,
-      title: "Curriculum Decomposition",
-      desc: "Identifies atomic syllabus objectives, Bloom cognitive levels, and official competency codes.",
-      category: "Graph",
-      status: "Active",
+      title: "Independent Review",
+      desc: "A second configured provider checks the draft against the same source. A failed or invalid review prevents saving.",
+      category: "Verification",
+      status: "Required",
     },
     {
       num: 4,
-      title: "DAG Prerequisite Assembly",
-      desc: "Constructs dependency edges with topological sorting and cycle prevention guarantees.",
-      category: "Graph",
-      status: "Active",
-    },
-    {
-      num: 5,
-      title: "Exam Question Mapping",
-      desc: "Ensemble mapping combining vector embeddings, lexical BM25, and LLM consensus scoring.",
-      category: "Assessment",
-      status: "Active",
-    },
-    {
-      num: 6,
-      title: "Class Mastery Feedback",
-      desc: "Ingests student mastery signals to trigger automated reteach windows for struggling concepts.",
-      category: "Mastery",
-      status: "Active",
-    },
-    {
-      num: 7,
-      title: "Assessment Emphasis Scoring",
-      desc: "Calculates historic past paper mark weights to prioritize high-yield curriculum objectives.",
-      category: "Optimization",
-      status: "Active",
-    },
-    {
-      num: 8,
-      title: "Constraint-Based Scheduling",
-      desc: "Solves optimal academic calendar allocations adhering to hard window and holiday constraints.",
-      category: "Scheduling",
-      status: "Active",
-    },
-    {
-      num: 9,
-      title: "Grounded Content Generation",
-      desc: "Generates student revision notes strictly conditioned on teacher-approved source material.",
-      category: "AI Generation",
-      status: "Dual-Engine",
-    },
-    {
-      num: 10,
-      title: "Factual Verification & Audit",
-      desc: "Secondary independent LLM audits every claim against raw source spans before publishing.",
-      category: "Verification",
-      status: "Guaranteed",
+      title: "Teacher Publishing",
+      desc: "The teacher publishes the outline, and enrolled students receive its notes and study plan.",
+      category: "Classroom",
+      status: "Ready",
     },
   ];
 
@@ -104,14 +62,14 @@ export default function PipelinePage() {
       <div style={{ marginBottom: "32px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
           <span className="badge info">Architecture & Telemetry</span>
-          <span className="badge ok">10-Stage Verification Engine</span>
+          <span className="badge info">Classroom Workflow</span>
         </div>
         <h1 style={{ fontSize: "36px", fontWeight: "800", letterSpacing: "-0.03em" }}>
-          Pipeline Architecture & Resilience Audit
+          Notes & Study Plan Workflow
         </h1>
         <p style={{ color: "var(--soft)", fontSize: "15px", maxWidth: "750px" }}>
-          EduFlow implements an end-to-end verified curriculum delivery pipeline. Every generated
-          sentence is factually bounded against source material, with automated failover and circuit breaker protection.
+          Follow how a teacher-approved source becomes student notes and a study plan.
+          AI review reduces unsupported claims; teachers should still check the result before teaching.
         </p>
       </div>
 
@@ -127,9 +85,9 @@ export default function PipelinePage() {
               Dynamic fallback chain with per-provider failure thresholds and automatic cooldown recovery.
             </p>
           </div>
-          <span className="badge ok">
+          <span className="badge info">
             <Activity size={12} />
-            Telemetry Active
+            {resilienceData?.providers ? "Current Process" : "Teacher Sign-In Required"}
           </span>
         </div>
 
@@ -162,8 +120,8 @@ export default function PipelinePage() {
                 Model: {prov.model}
               </div>
               <div style={{ fontSize: "11px", color: "var(--soft)" }}>
-                Circuit: <strong style={{ color: prov.configured ? "var(--ok)" : "var(--warn)" }}>
-                  {prov.configured ? "Active" : "Unconfigured"}
+                Provider: <strong style={{ color: prov.configured ? "var(--ok)" : "var(--warn)" }}>
+                  {prov.configured ? "Configured" : "Unconfigured"}
                 </strong>
               </div>
             </div>
@@ -214,14 +172,15 @@ export default function PipelinePage() {
               color: "var(--soft)",
             }}
           >
-            No provider events logged in this session yet. Events will appear here during AI generation and verification calls.
+            {resilienceData?.error ||
+              "No provider events in this server process. Events appear during AI generation and review."}
           </div>
         )}
       </div>
 
-      {/* 10-Stage Pipeline Overview */}
+      {/* Current classroom workflow */}
       <h2 style={{ fontSize: "24px", fontWeight: "800", letterSpacing: "-0.03em", marginBottom: "18px" }}>
-        The 10-Stage Educational Pipeline
+        The Four-Step Classroom Workflow
       </h2>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "18px" }}>

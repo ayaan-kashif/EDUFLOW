@@ -70,17 +70,23 @@ export class FallbackLLMChain {
 
   async complete(
     messages: LLMMessage[],
-    options: { maxTokens?: number; temperature?: number } = {}
+    options: { maxTokens?: number; temperature?: number; excludeProvider?: string } = {}
   ): Promise<LLMResponse> {
     if (this.providers.length === 0) {
       throw new Error(
         "No LLM providers configured. Please provide GEMINI_API_KEY (primary) or GROQ_API_KEY (backup) in .env.local."
       );
     }
+    if (options.excludeProvider && this.providers.every(
+      ({ provider }) => provider.name === options.excludeProvider
+    )) {
+      throw new Error("Independent AI verifier is not configured. Add a second provider key.");
+    }
 
     const errors: string[] = [];
 
     for (const { provider, breaker } of this.providers) {
+      if (provider.name === options.excludeProvider) continue;
       const startTime = Date.now();
       try {
         breaker.check(provider.name);

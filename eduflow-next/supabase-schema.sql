@@ -168,29 +168,23 @@ ALTER TABLE public.scheduled_units ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.claims ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.claim_evidence ENABLE ROW LEVEL SECURITY;
 
--- Grants for API roles
-GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role;
-GRANT ALL ON ALL TABLES IN SCHEMA public TO anon;
-GRANT ALL ON ALL TABLES IN SCHEMA public TO authenticated;
-
--- Policies allowing Next.js backend full access via service_role key
-DO $$ 
+-- The app uses its own teacher/student sessions in server-only Next.js routes.
+-- Browser keys must not access these tables, especially password hashes and sessions.
+-- These statements also remove access if an earlier version of this script was run.
+DO $$
+DECLARE
+  table_name text;
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'service_role_portal_users') THEN
-    CREATE POLICY "service_role_portal_users" ON public.portal_users FOR ALL TO public USING (true) WITH CHECK (true);
-    CREATE POLICY "service_role_portal_sessions" ON public.portal_sessions FOR ALL TO public USING (true) WITH CHECK (true);
-    CREATE POLICY "service_role_teacher_enrollments" ON public.teacher_enrollments FOR ALL TO public USING (true) WITH CHECK (true);
-    CREATE POLICY "service_role_class_outlines" ON public.class_outlines FOR ALL TO public USING (true) WITH CHECK (true);
-    CREATE POLICY "service_role_curriculum_nodes" ON public.curriculum_nodes FOR ALL TO public USING (true) WITH CHECK (true);
-    CREATE POLICY "service_role_curriculum_edges" ON public.curriculum_edges FOR ALL TO public USING (true) WITH CHECK (true);
-    CREATE POLICY "service_role_source_documents" ON public.source_documents FOR ALL TO public USING (true) WITH CHECK (true);
-    CREATE POLICY "service_role_source_spans" ON public.source_spans FOR ALL TO public USING (true) WITH CHECK (true);
-    CREATE POLICY "service_role_academic_calendars" ON public.academic_calendars FOR ALL TO public USING (true) WITH CHECK (true);
-    CREATE POLICY "service_role_calendar_days" ON public.calendar_days FOR ALL TO public USING (true) WITH CHECK (true);
-    CREATE POLICY "service_role_teaching_units" ON public.teaching_units FOR ALL TO public USING (true) WITH CHECK (true);
-    CREATE POLICY "service_role_plan_versions" ON public.plan_versions FOR ALL TO public USING (true) WITH CHECK (true);
-    CREATE POLICY "service_role_scheduled_units" ON public.scheduled_units FOR ALL TO public USING (true) WITH CHECK (true);
-    CREATE POLICY "service_role_claims" ON public.claims FOR ALL TO public USING (true) WITH CHECK (true);
-    CREATE POLICY "service_role_claim_evidence" ON public.claim_evidence FOR ALL TO public USING (true) WITH CHECK (true);
-  END IF;
+  FOREACH table_name IN ARRAY ARRAY[
+    'portal_users', 'portal_sessions', 'teacher_enrollments', 'class_outlines',
+    'curriculum_nodes', 'curriculum_edges', 'source_documents', 'source_spans',
+    'academic_calendars', 'calendar_days', 'teaching_units', 'plan_versions',
+    'scheduled_units', 'claims', 'claim_evidence'
+  ] LOOP
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I',
+                   'service_role_' || table_name, table_name);
+    EXECUTE format('REVOKE ALL ON TABLE public.%I FROM PUBLIC, anon, authenticated', table_name);
+    EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.%I TO service_role',
+                   table_name);
+  END LOOP;
 END $$;

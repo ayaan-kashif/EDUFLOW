@@ -3,9 +3,9 @@ import { Navbar } from "@/components/Navbar";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "EduFlow — AI-Powered Curriculum & Classroom Operating System",
+  title: "EduFlow — Teacher Notes & Student Study Plans",
   description:
-    "End-to-end curriculum decomposition, resilient constraint-based scheduling, grounded revision notes, and multi-model factual verification.",
+    "Teachers share source-guided AI notes and seven-day study plans with students using a classroom enrollment code.",
 };
 
 export default function RootLayout({

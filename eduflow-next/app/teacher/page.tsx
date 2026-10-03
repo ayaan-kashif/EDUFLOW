@@ -162,7 +162,7 @@ export default function TeacherPage() {
       }
 
       setOutlines(outlines.map((o) => (o.id === outlineId ? data : o)));
-      setSuccessMsg("Study notes & 7-day revision plan generated and verified!");
+      setSuccessMsg("Study notes and 7-day plan generated and AI-reviewed. Please check them before publishing.");
       setExpandedOutlineId(outlineId);
     } catch (err: any) {
       setErrorMsg(err.message || "Failed to generate material");
@@ -313,7 +313,7 @@ export default function TeacherPage() {
             Hello, {user.name}
           </h1>
           <p style={{ color: "var(--soft)", fontSize: "14px" }}>
-            Share verified lesson materials and track enrolled students.
+            Share reviewed lesson materials and track enrolled students.
           </p>
         </div>
 
@@ -476,7 +476,7 @@ export default function TeacherPage() {
                             className="primary"
                             onClick={() => handleGenerate(outline.id)}
                             disabled={generatingId === outline.id || !hasSource}
-                            title={!hasSource ? "Needs 200+ chars of source text" : "Generate verified notes"}
+                            title={!hasSource ? "Needs 200+ chars of source text" : "Generate AI-reviewed notes"}
                             style={{ padding: "8px 14px", fontSize: "12px" }}
                           >
                             <Sparkles size={14} />
