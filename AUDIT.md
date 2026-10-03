@@ -5,10 +5,10 @@
 - Current app: Next.js 16 / React 19 in `eduflow-next`, deployed at
   `https://eduflow-beryl-three.vercel.app/`.
 - Public `/`, `/teacher`, and `/student` returned HTTP 200 during this review.
-- Public `/api/health` returned HTTP 500 on the deployed commit. The local
-  Supabase secret key was rejected with HTTP 401; the public key could not
-  access `portal_users`. A valid complete secret key and applied schema are
-  required before a full production classroom test.
+- Public `/api/health` returned HTTP 500 on the earlier deployed commit and
+  HTTP 503 after the fixes deployed. The local Supabase secret key worked from
+  a server-style request. Supabase returned `PGRST205`: `public.portal_users`
+  is missing. Apply the schema before a full production classroom test.
 - Local `npm run build` passed, including TypeScript. Local `npm run lint`
   passed with warnings from legacy loose types and unused imports.
 - Gemini and Groq model-list endpoints returned HTTP 200; both configured
@@ -36,7 +36,7 @@
 
 ## Remaining verification
 
-1. Set the complete `SUPABASE_SECRET_KEY` in local `.env.local` and Vercel
+1. Keep the complete `SUPABASE_SECRET_KEY` in local `.env.local` and Vercel
    Production. Do not paste it into chat or commit it.
 2. Run the current `eduflow-next/supabase-schema.sql` in Supabase SQL Editor.
    Verify `/api/health` returns 200 after redeployment.
