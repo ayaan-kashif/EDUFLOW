@@ -7,8 +7,5 @@
     "build": "npm --prefix eduflow-next run build",
     "start": "npm --prefix eduflow-next run start",
     "migrate:supabase": "npm --prefix eduflow-next run migrate:supabase"
-  },
-  "workspaces": [
-    "eduflow-next"
-  ]
+  }
 }
