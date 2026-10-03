@@ -14,7 +14,7 @@
 - The first Next.js GitHub Actions run failed at `npm ci`: the root
   `package.json` declared a workspace but had no root lockfile. Removed that
   unused workspace declaration; `npm ci --dry-run` now succeeds from
-  `eduflow-next`. The follow-up GitHub check still needs confirmation.
+  `eduflow-next`. GitHub Actions passed on commit `7dd64d1`.
 - Gemini and Groq model-list endpoints returned HTTP 200; both configured
   model IDs were present. Content generation and independent review were not
   exercised because the database is not ready.
