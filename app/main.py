@@ -2,6 +2,7 @@ import logging
 from collections import defaultdict, deque
 from pathlib import Path
 from time import monotonic
+from urllib.parse import urlsplit
 from uuid import uuid4
 
 from fastapi import FastAPI, Request
@@ -10,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.api.browse import router as browse_router
 from app.api.calendar import router as calendar_router
+from app.api.classroom import router as classroom_router
 from app.api.control import router as control_router
 from app.api.corrections import router as corrections_router
 from app.api.debug import router as debug_router
@@ -32,8 +34,12 @@ REQUEST_HISTORY: defaultdict[str, deque[float]] = defaultdict(deque)
 async def request_observability(request: Request, call_next):
     request_id = uuid4().hex
     start = monotonic()
+    if request.url.path.startswith("/classroom/") and request.method in {"POST", "PUT", "PATCH", "DELETE"}:
+        origin = request.headers.get("origin")
+        if origin and urlsplit(origin).netloc != request.url.netloc:
+            return JSONResponse(status_code=403, content={"detail": "Invalid request origin"})
     if request.method == "POST" and request.url.path.startswith(
-        ("/planning", "/generation", "/ingestion", "/demo", "/studio")
+        ("/planning", "/generation", "/ingestion", "/demo", "/studio", "/classroom")
     ):
         client = request.client.host if request.client else "unknown"
         for key in list(REQUEST_HISTORY):
@@ -75,6 +81,7 @@ async def infeasible_plan(request: Request, exc: InfeasibleScheduleError):
 
 
 app.include_router(health_router)
+app.include_router(classroom_router)
 app.include_router(ingestion_router)
 app.include_router(calendar_router)
 app.include_router(mapping_router)

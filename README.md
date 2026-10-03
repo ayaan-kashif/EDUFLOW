@@ -1,5 +1,37 @@
 # EduFlow
 
+## Teacher and student portals
+
+Open `/teacher.html` to create a teacher account. The teacher receives an eight-character
+enrollment code, can save and edit outlines, publish them to enrolled students, and
+generate revision notes plus a seven-day study plan. Open `/student.html` to create a
+student account, enter the teacher's code, and view that teacher's published materials.
+Students may join multiple teachers. Edits return an outline to draft and clear its old
+AI materials until the teacher republishes and regenerates it.
+
+The **Generate notes and plan** action uses the configured generation provider in
+`config/providers.yaml`. Set `HF_TOKEN`, `OPENAI_API_KEY`, another supported provider key,
+or run Ollama with `OLLAMA_MODEL` pulled locally. Without a reachable model, outlines can
+still be published, but generation returns an explicit error. AI notes should be reviewed
+by the teacher before students rely on them; the generation prompt asks the model to flag
+gaps in a sparse outline.
+
+On Windows, a clean local setup is:
+
+```powershell
+python -m venv .venv
+.venv\Scripts\python.exe -m pip install -e ".[dev]"
+Copy-Item .env.example .env
+.venv\Scripts\python.exe scripts/setup_sqlite.py
+.venv\Scripts\python.exe -m uvicorn app.main:app --reload
+```
+
+Then visit <http://localhost:8000/teacher.html> or
+<http://localhost:8000/student.html>. For an existing PostgreSQL database, apply
+`alembic upgrade head` to create the new portal tables. The original planning workspace
+at `/` remains a hackathon prototype and its older API routes are not account scoped;
+use the new portals for teacher and student class sharing.
+
 > EduFlow ingests textbooks, past papers, mark schemes, and academic calendars to build a grounded, citable term plan — and automatically replans it when the calendar changes, while minimizing disruption to what's already been taught.
 
 ## What it actually does
@@ -38,7 +70,7 @@ for the implemented features, evaluation results, and remaining production work.
 ## Ground rules
 
 1. Generated claims undergo citation-resolution, content-hash, and supplied-quote checks before independent semantic verification. Mechanical integrity alone does not establish factual support.
-2. No student-level data. Class-level, teacher-entered mastery signals only.
+2. The original planner uses class-level, teacher-entered mastery signals. The new portal stores student accounts and teacher enrollment only for access to shared study materials; it does not add individual mastery tracking.
 3. Every external API (LLM, embeddings, parsing) goes through the provider abstraction in `app/providers/` — never call an SDK directly elsewhere.
 4. Verification must use a different provider/model than generation. A model does not grade its own homework; this is enforced at call time, not just in config.
 5. Minimizing replan churn is a first-class scheduling objective, not an afterthought.

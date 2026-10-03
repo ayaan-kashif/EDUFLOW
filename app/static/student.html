@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Student portal · EduFlow</title><link rel="stylesheet" href="/ui-system.css"><link rel="stylesheet" href="/portal.css"><script defer src="/portal.js"></script>
+</head>
+<body data-role="student">
+  <header class="topbar"><a class="brand" href="/">Edu<span>Flow</span><small>STUDENT</small></a><nav><a href="/teacher.html">Teacher portal</a><button id="theme-toggle" type="button" aria-label="Switch to dark mode">◐</button><button id="logout" hidden>Sign out</button></nav></header>
+  <main>
+    <section class="hero"><div class="hero-copy"><p class="eyebrow"><span class="signal"></span> YOUR STUDY SPACE</p><h1>Know what to learn. <em>Know what’s next.</em></h1><p>Join your teacher’s class to unlock course outlines, revision notes, and a seven day plan built around what you’re learning.</p><div class="hero-points"><span>One class code</span><span>Clear notes</span><span>A plan that fits</span></div><a class="hero-cta" href="#auth">Get started <span aria-hidden="true">↗</span></a></div><div class="portal-visual student-visual" aria-hidden="true"><div class="visual-orbit orbit-one"></div><div class="visual-orbit orbit-two"></div><div class="visual-glow"></div><div class="visual-card visual-back"><small>COURSE NOTES</small><i></i><i></i><i></i></div><div class="visual-card visual-front"><small>FOCUS FOR TODAY</small><strong>Small steps.<br>Big progress.</strong><div class="visual-progress"><span></span><span></span><span></span><span></span><span></span><span></span></div><em>Day 01 / 07</em></div><div class="visual-chip">READY TO GO</div></div></section>
+    <div id="message" role="status" aria-live="polite" hidden></div>
+    <section id="auth" class="card auth"><h2>Welcome, student</h2><p>Create an account or sign in to join a teacher.</p><form id="auth-form"><label id="name-label">Your name<input name="name" autocomplete="name" required></label><label>Email<input name="email" type="email" autocomplete="email" required></label><label>Password<input name="password" type="password" autocomplete="new-password" minlength="8" required></label><button class="primary" type="submit">Create student account</button></form><button id="auth-toggle" class="text-button">Already have an account? Sign in</button></section>
+    <section id="dashboard" hidden><div class="dashboard-head"><div><p class="eyebrow">YOUR STUDY SPACE</p><h2 id="greeting"></h2></div><form id="enroll-form" class="code-card"><label>JOIN A TEACHER<input name="code" placeholder="Enter teacher code" required maxlength="16"></label><button class="primary" type="submit">Join class</button></form></div><div class="grid"><section class="card"><h3>Your teachers</h3><div id="teachers"></div></section><section class="card"><h3>Course materials</h3><div id="materials" class="stack"></div></section></div></section>
+  </main><footer>EduFlow · Student portal</footer>
+</body></html>

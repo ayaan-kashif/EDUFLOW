@@ -1,28 +1,50 @@
+# Python environments and generated packages
 __pycache__/
 *.py[cod]
 *.egg-info/
 .eggs/
 .venv/
 venv/
-.env
-.env.*
-!.env.example
+dist/
+build/
+
+# Local configuration and credentials (keep .env.example as a template)
+**/.env
+**/.env.*
+!**/.env.example
+secrets/
+*.pem
+*.p12
+*.pfx
+*.key
+
+# Local databases and generated application data
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+.runtime/
+uploads/
+
+# Test, coverage, and browser output
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
-htmlcov/
+.hypothesis/
 .coverage
-dist/
-build/
+.coverage.*
+htmlcov/
+node_modules/
+playwright-report/
+test-results/
 *.log
+
+# Editor and operating-system files
 .DS_Store
+Thumbs.db
 .idea/
 .vscode/
+.codex/
 .claude/uploads/
-
-curriculumos.db
-curriculumos.db-wal
-curriculumos.db-shm
-.runtime/
-uploads/
-demo_offline.db

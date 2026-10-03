@@ -493,3 +493,49 @@ class ClaimEvidence(Base):
     source_span_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("source_spans.id", ondelete="CASCADE"), primary_key=True
     )
+
+
+class PortalUser(UUIDPk, CreatedAtMixin, Base):
+    __tablename__ = "portal_users"
+
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    role: Mapped[str] = mapped_column(String(12), nullable=False)
+    enrollment_code: Mapped[str | None] = mapped_column(String(16), unique=True)
+
+
+class PortalSession(UUIDPk, Base):
+    __tablename__ = "portal_sessions"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("portal_users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class TeacherEnrollment(Base):
+    __tablename__ = "teacher_enrollments"
+
+    teacher_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("portal_users.id", ondelete="CASCADE"), primary_key=True
+    )
+    student_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("portal_users.id", ondelete="CASCADE"), primary_key=True
+    )
+
+
+class ClassOutline(UUIDPk, CreatedAtMixin, Base):
+    __tablename__ = "class_outlines"
+
+    teacher_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("portal_users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    subject: Mapped[str] = mapped_column(String(120), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    published: Mapped[bool] = mapped_column(nullable=False, default=False)
+    notes: Mapped[str | None] = mapped_column(Text)
+    study_plan: Mapped[dict | None] = mapped_column(PortableJSON())
+    generated_by: Mapped[str | None] = mapped_column(String(200))
